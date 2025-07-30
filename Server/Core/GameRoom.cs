@@ -46,16 +46,23 @@ public class GameRoom
 
     // Phương thức StartGame() sẽ được thêm ở bước 3
 
-    public async Task BroadcastMessageAsync(BaseMessage message, Player excludeClient = null)
+public async Task BroadcastMessageAsync(BaseMessage message, Player? excludePlayer = null)
+{
+    var broadcastTasks = new List<Task>();
+    
+    // Lọc ra những người chơi hợp lệ để gửi tin
+    var recipients = Players.Where(p => p != excludePlayer && p.IsConnected && p.ActiveConnection != null);
+
+    foreach (var player in recipients)
     {
-        foreach (var player in Players)
-        {
-            if (player != excludeClient)
-            {
-                await player.ActiveConnection.SendMessageAsync(message);
-            }
-        }
+        // Thêm tác vụ gửi tin của mỗi người vào một danh sách
+        broadcastTasks.Add(player.ActiveConnection!.SendMessageAsync(message));
     }
+
+    // Chờ cho tất cả các tác vụ gửi tin hoàn thành
+    // Lợi ích: Gửi đồng thời và không bị dừng lại nếu một tác vụ lỗi
+    await Task.WhenAll(broadcastTasks);
+}
     private void StartGame()
     {
         Console.WriteLine($"Game starting in room {RoomId}...");
@@ -202,7 +209,7 @@ public class GameRoom
         PlayerId = disconnectedPlayerId,
         ReconnectTime = 30
     };
-    await BroadcastMessageAsync(notification, excludeClient: disconnectedPlayer);
+    await BroadcastMessageAsync(notification, excludePlayer: disconnectedPlayer);
 
     // Bắt đầu đếm ngược
     await Task.Delay(30000); // Chờ 30 giây
