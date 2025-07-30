@@ -135,7 +135,12 @@ public class ClientHandler
     this.PlayerData = newPlayer;
 
     // Thông báo cho người chơi cũ về người mới
-    var notification = new PlayerJoinedNotification { /*...*/ };
+    var notification = new PlayerJoinedNotification
+    { 
+        Type = "PLAYER_JOINED",
+        PlayerName = newPlayer.PlayerName,
+        PlayerId = room.Players.Count 
+    };
     await room.BroadcastMessageAsync(notification);
 
     // Lấy danh sách người chơi HIỆN TẠI (trước khi thêm người mới)
