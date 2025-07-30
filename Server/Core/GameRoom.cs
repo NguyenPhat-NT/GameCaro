@@ -46,6 +46,7 @@ public class GameRoom
 
     // Phương thức StartGame() sẽ được thêm ở bước 3
 
+<<<<<<< HEAD
 public async Task BroadcastMessageAsync(BaseMessage message, Player? excludePlayer = null)
 {
     var broadcastTasks = new List<Task>();
@@ -63,6 +64,18 @@ public async Task BroadcastMessageAsync(BaseMessage message, Player? excludePlay
     // Lợi ích: Gửi đồng thời và không bị dừng lại nếu một tác vụ lỗi
     await Task.WhenAll(broadcastTasks);
 }
+=======
+    public async Task BroadcastMessageAsync(BaseMessage message, Player excludeClient = null)
+    {
+        foreach (var player in Players)
+        {
+            if (player != excludeClient)
+            {
+                await player.ActiveConnection.SendMessageAsync(message);
+            }
+        }
+    }
+>>>>>>> 4c09f8c (Initial commit)
     private void StartGame()
     {
         Console.WriteLine($"Game starting in room {RoomId}...");
@@ -209,7 +222,11 @@ public async Task BroadcastMessageAsync(BaseMessage message, Player? excludePlay
         PlayerId = disconnectedPlayerId,
         ReconnectTime = 30
     };
+<<<<<<< HEAD
     await BroadcastMessageAsync(notification, excludePlayer: disconnectedPlayer);
+=======
+    await BroadcastMessageAsync(notification, excludeClient: disconnectedPlayer);
+>>>>>>> 4c09f8c (Initial commit)
 
     // Bắt đầu đếm ngược
     await Task.Delay(30000); // Chờ 30 giây
