@@ -46,7 +46,6 @@ public class GameRoom
 
     // Phương thức StartGame() sẽ được thêm ở bước 3
 
-<<<<<<< HEAD
 public async Task BroadcastMessageAsync(BaseMessage message, Player? excludePlayer = null)
 {
     var broadcastTasks = new List<Task>();
@@ -64,18 +63,7 @@ public async Task BroadcastMessageAsync(BaseMessage message, Player? excludePlay
     // Lợi ích: Gửi đồng thời và không bị dừng lại nếu một tác vụ lỗi
     await Task.WhenAll(broadcastTasks);
 }
-=======
-    public async Task BroadcastMessageAsync(BaseMessage message, Player excludeClient = null)
-    {
-        foreach (var player in Players)
-        {
-            if (player != excludeClient)
-            {
-                await player.ActiveConnection.SendMessageAsync(message);
-            }
-        }
-    }
->>>>>>> 4c09f8c (Initial commit)
+
     private void StartGame()
     {
         Console.WriteLine($"Game starting in room {RoomId}...");
@@ -222,22 +210,47 @@ public async Task BroadcastMessageAsync(BaseMessage message, Player? excludePlay
         PlayerId = disconnectedPlayerId,
         ReconnectTime = 30
     };
-<<<<<<< HEAD
     await BroadcastMessageAsync(notification, excludePlayer: disconnectedPlayer);
-=======
-    await BroadcastMessageAsync(notification, excludeClient: disconnectedPlayer);
->>>>>>> 4c09f8c (Initial commit)
+
 
     // Bắt đầu đếm ngược
     await Task.Delay(30000); // Chờ 30 giây
 
-    // Sau 30 giây, kiểm tra xem người chơi đã kết nối lại chưa
-    if (!disconnectedPlayer.IsConnected)
-    {
-        Console.WriteLine($"Player {disconnectedPlayer.PlayerName} failed to reconnect. Forfeited.");
-        // Xử lý thua cuộc cho người chơi đó, game vẫn tiếp tục cho 3 người còn lại
-        // Hiện tại, ta chỉ cần đảm bảo lượt đi của người này sẽ được bỏ qua.
-        // Ta có thể gửi một thông báo "PlayerForfeited" nếu cần.
+        // Sau 30 giây, kiểm tra xem người chơi đã kết nối lại chưa
+        if (!disconnectedPlayer.IsConnected)
+        {
+            Console.WriteLine($"Player {disconnectedPlayer.PlayerName} failed to reconnect. Forfeited.");
+            // Xử lý thua cuộc cho người chơi đó, game vẫn tiếp tục cho 3 người còn lại
+            // Hiện tại, ta chỉ cần đảm bảo lượt đi của người này sẽ được bỏ qua.
+            // Ta có thể gửi một thông báo "PlayerForfeited" nếu cần.
+
+        // Chỉ xử lý nếu đúng là lượt của người chơi vừa bị xử thua
+        if (this.CurrentPlayerIndex == disconnectedPlayerId)
+        {
+                // Log.Information("It was the disconnected player's turn. Advancing turn...");
+
+                // 1. Kiểm tra xem có còn người chơi nào đang kết nối không
+                if (!Players.Any(p => p.IsConnected))
+                {
+                    Console.WriteLine($"All players have disconnected. Ending game in room {RoomId}.");
+                    this.State = RoomState.Finished;
+                    return; // Thoát khỏi phương thức để dừng game
+                }
+
+                // 2. Nếu còn, vòng lặp tìm người chơi tiếp theo bây giờ đã an toàn
+                do
+                {
+                    this.CurrentPlayerIndex = (this.CurrentPlayerIndex + 1) % this.Players.Count;
+                } while (!this.Players[this.CurrentPlayerIndex].IsConnected);
+
+            // Gửi thông báo lượt đi mới cho tất cả người chơi còn lại
+            var turnUpdateNotif = new TurnUpdateNotification
+            {
+                Type = "TURN_UPDATE",
+                NextPlayerId = this.CurrentPlayerIndex
+            };
+            await BroadcastMessageAsync(turnUpdateNotif);
+        }
     }
 }
 }
