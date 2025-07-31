@@ -36,12 +36,6 @@ public class GameRoom
         if (State != RoomState.Waiting) return;
 
         Players.Add(player);
-
-        // Khi đủ 4 người, bắt đầu game
-        if (Players.Count == 4)
-        {
-            StartGame();
-        }
     }
 
     // Phương thức StartGame() sẽ được thêm ở bước 3
@@ -64,7 +58,7 @@ public async Task BroadcastMessageAsync(BaseMessage message, Player? excludePlay
     await Task.WhenAll(broadcastTasks);
 }
 
-    private void StartGame()
+    public void StartGame()
     {
         Console.WriteLine($"Game starting in room {RoomId}...");
         this.State = RoomState.Playing;

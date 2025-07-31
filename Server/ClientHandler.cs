@@ -120,45 +120,52 @@ public class ClientHandler
         };
         _ = SendMessageAsync(response);
     }
-   private async Task HandleJoinRoom(string jsonString)
-{
-    var request = JsonSerializer.Deserialize<JoinRoomRequest>(jsonString);
-    if (request == null) return;
-
-    var room = LobbyManager.GetRoom(request.RoomId.ToUpper());
-
-    // ... phần kiểm tra phòng không tồn tại, phòng đầy/đang chơi giữ nguyên ...
-
-    // 3. Xử lý khi vào phòng thành công
-    this.CurrentRoom = room;
-    var newPlayer = new Player(request.PlayerName, this);
-    this.PlayerData = newPlayer;
-
-    // Thông báo cho người chơi cũ về người mới
-    var notification = new PlayerJoinedNotification
-    { 
-        Type = "PLAYER_JOINED",
-        PlayerName = newPlayer.PlayerName,
-        PlayerId = room.Players.Count 
-    };
-    await room.BroadcastMessageAsync(notification);
-
-    // Lấy danh sách người chơi HIỆN TẠI (trước khi thêm người mới)
-    var existingPlayers = room.Players.Select((p, index) => new PlayerInfo { PlayerName = p.PlayerName, PlayerId = index }).ToList();
-
-    // Thêm người chơi mới vào phòng
-    room.AddPlayer(newPlayer);
-
-    // Gửi kết quả thành công cho người chơi mới
-    var joinResult = new JoinRoomResult
+    private async Task HandleJoinRoom(string jsonString)
     {
-        Type = "JOIN_RESULT",
-        Success = true,
-        RoomId = room.RoomId,
-        Players = existingPlayers, // Gửi danh sách người chơi cũ
-        SessionToken = newPlayer.SessionToken
-    };
-    await SendMessageAsync(joinResult);
+        var request = JsonSerializer.Deserialize<JoinRoomRequest>(jsonString);
+        if (request == null) return;
+
+        var room = LobbyManager.GetRoom(request.RoomId.ToUpper());
+
+        // ... phần kiểm tra phòng không tồn tại, phòng đầy/đang chơi giữ nguyên ...
+
+        // 3. Xử lý khi vào phòng thành công
+        this.CurrentRoom = room;
+        var newPlayer = new Player(request.PlayerName, this);
+        this.PlayerData = newPlayer;
+
+        // Thông báo cho người chơi cũ về người mới
+        var notification = new PlayerJoinedNotification
+        {
+            Type = "PLAYER_JOINED",
+            PlayerName = newPlayer.PlayerName,
+            PlayerId = room.Players.Count
+        };
+        await room.BroadcastMessageAsync(notification);
+
+        // Lấy danh sách người chơi HIỆN TẠI (trước khi thêm người mới)
+        var existingPlayers = room.Players.Select((p, index) => new PlayerInfo { PlayerName = p.PlayerName, PlayerId = index }).ToList();
+
+        // Thêm người chơi mới vào phòng
+        room.AddPlayer(newPlayer);
+
+        // Gửi kết quả thành công cho người chơi mới
+        var joinResult = new JoinRoomResult
+        {
+            Type = "JOIN_RESULT",
+            Success = true,
+            RoomId = room.RoomId,
+            Players = existingPlayers, // Gửi danh sách người chơi cũ
+            SessionToken = newPlayer.SessionToken
+        };
+        await SendMessageAsync(joinResult);
+
+        // KIỂM TRA ĐỂ BẮT ĐẦU GAME
+        if (room.Players.Count == 4)
+        {
+            // Dùng Task.Run để không block handler hiện tại
+            _ = Task.Run(() => room.StartGame());
+        }
 }
     private void HandleMakeMove(string jsonString)
     {
