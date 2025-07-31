@@ -2,48 +2,31 @@ import 'package:flutter/material.dart';
 import '../models/player_model.dart';
 import '../game_theme.dart';
 import '../widgets/player_info_card.dart';
+import '../widgets/game_board.dart';
+import '../services/game_service.dart';
+import 'package:provider/provider.dart';
 
-class GameScreen extends StatefulWidget {
+class GameScreen extends StatelessWidget {
   const GameScreen({super.key});
-
-  @override
-  State<GameScreen> createState() => _GameScreenState();
-}
-
-class _GameScreenState extends State<GameScreen> {
-  // Dữ liệu giả lập - sau này sẽ thay bằng dữ liệu từ server
-  late final List<Player> players;
-  int currentPlayerId = 0; // ID của người chơi hiện tại
-
-  @override
-  void initState() {
-    super.initState();
-    // Khởi tạo danh sách người chơi giả lập
-    players = [
-      Player(id: 0, name: "Player 1", color: AppColors.player1),
-      Player(id: 1, name: "Player 2", color: AppColors.player2),
-      Player(id: 2, name: "Player 3", color: AppColors.player3),
-      Player(id: 3, name: "Player 4", color: AppColors.player4),
-    ];
-  }
-
-  // Hàm để chuyển lượt (dùng để test)
-  void _nextTurn() {
-    setState(() {
-      currentPlayerId = (currentPlayerId + 1) % 4;
-    });
-  }
+  final int boardSize = 30;
 
   @override
   Widget build(BuildContext context) {
+    // Lấy GameService từ Provider
+    final gameService = context.watch<GameService>();
+
+    // Xử lý khi không có người chơi (trạng thái khởi tạo)
+    if (gameService.players.isEmpty) {
+      return const Scaffold(
+        body: Center(child: Text("Đang chờ người chơi khác...")),
+      );
+    }
+
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
-            // VÙNG THÔNG TIN TRẬN ĐẤU (TASK 1.10)
-            _buildTopInfoBar(),
-
-            // VÙNG CHÍNH CỦA GAME
+            _buildTopInfoBar(context, gameService),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -52,103 +35,85 @@ class _GameScreenState extends State<GameScreen> {
                 ),
                 child: Row(
                   children: [
-                    // Cột thông tin người chơi bên trái
-                    _buildPlayersColumn([players[0], players[1]]),
-
-                    // VÙNG BÀN CỜ (TASK 1.11)
-                    Expanded(child: _buildGameBoard()),
-
-                    // Cột thông tin người chơi bên phải
-                    _buildPlayersColumn([players[2], players[3]]),
+                    _buildPlayersColumn(context, gameService, [0, 1]),
+                    Expanded(
+                      child: GameBoard(
+                        size: boardSize,
+                        moves: gameService.moves,
+                        players: gameService.players,
+                        onMoveMade: (x, y) {
+                          // Chỉ cho phép đi khi đến lượt
+                          // Cần có ID của client để so sánh chính xác
+                          if (gameService.currentPlayerId !=
+                              null /*&& gameService.currentPlayerId == myId*/ ) {
+                            gameService.makeMove(x, y);
+                          } else {
+                            print("Chưa đến lượt của bạn!");
+                          }
+                        },
+                      ),
+                    ),
+                    _buildPlayersColumn(context, gameService, [2, 3]),
                   ],
                 ),
               ),
             ),
-
-            // VÙNG CÁC NÚT ĐIỀU KHIỂN (TASK 1.9)
-            _buildControlButtons(),
+            _buildControlButtons(context),
           ],
         ),
       ),
     );
   }
 
-  // Widget cho thanh thông tin trên cùng
-  Widget _buildTopInfoBar() {
+  Widget _buildTopInfoBar(BuildContext context, GameService gameService) {
+    final currentPlayer = gameService.players.firstWhere(
+      (p) => p.id == gameService.currentPlayerId,
+      orElse: () => Player(id: -1, name: "...", color: Colors.grey),
+    );
+
     return Padding(
       padding: const EdgeInsets.all(12.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text("Phòng: XYZ123", style: Theme.of(context).textTheme.bodyMedium),
           Text(
-            "Lượt của: ${players[currentPlayerId].name}",
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: players[currentPlayerId].color,
-            ),
+            "Phòng: ${gameService.roomId ?? '...'}",
+            style: Theme.of(context).textTheme.bodyMedium,
           ),
-          IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () {
-              /* TODO: Mở menu */
-            },
+          Text(
+            "Lượt của: ${currentPlayer.name}",
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(color: currentPlayer.color),
           ),
+          IconButton(icon: const Icon(Icons.menu), onPressed: () {}),
         ],
       ),
     );
   }
 
-  // Widget cho cột thông tin người chơi
-  Widget _buildPlayersColumn(List<Player> playerList) {
+  Widget _buildPlayersColumn(
+    BuildContext context,
+    GameService gameService,
+    List<int> playerIndexes,
+  ) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children:
-          playerList
-              .map(
-                (player) => PlayerInfoCard(
-                  player: player,
-                  isMyTurn: player.id == currentPlayerId,
-                ),
-              )
-              .toList(),
+          playerIndexes.map((index) {
+            if (index < gameService.players.length) {
+              final player = gameService.players[index];
+              return PlayerInfoCard(
+                player: player,
+                isMyTurn: player.id == gameService.currentPlayerId,
+              );
+            }
+            return const SizedBox(width: 100, height: 100); // Placeholder
+          }).toList(),
     );
   }
 
-  // Widget placeholder cho bàn cờ
-  Widget _buildGameBoard() {
-    return GestureDetector(
-      onTap: _nextTurn, // Chạm vào bàn cờ để test chuyển lượt
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8.0),
-        decoration: BoxDecoration(
-          color: AppColors.boardBackground,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.gridLines, width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: const Center(
-          child: Text(
-            "BÀN CỜ 20x20\n(Scroll & Zoom)",
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppColors.secondaryText,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Widget cho các nút điều khiển dưới cùng
-  Widget _buildControlButtons() {
+  Widget _buildControlButtons(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(12.0),
       child: Row(
@@ -157,9 +122,7 @@ class _GameScreenState extends State<GameScreen> {
           ElevatedButton.icon(
             icon: const Icon(Icons.chat_bubble_outline),
             label: Text("Chat", style: Theme.of(context).textTheme.labelLarge),
-            onPressed: () {
-              /* TODO: Mở khung chat */
-            },
+            onPressed: () {},
             style: ElevatedButton.styleFrom(backgroundColor: Colors.grey),
           ),
           ElevatedButton.icon(
@@ -168,9 +131,7 @@ class _GameScreenState extends State<GameScreen> {
               "Game Mới",
               style: Theme.of(context).textTheme.labelLarge,
             ),
-            onPressed: () {
-              /* TODO: Gửi yêu cầu game mới */
-            },
+            onPressed: () {},
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.player3),
           ),
           ElevatedButton.icon(
@@ -179,9 +140,7 @@ class _GameScreenState extends State<GameScreen> {
               "Đầu Hàng",
               style: Theme.of(context).textTheme.labelLarge,
             ),
-            onPressed: () {
-              /* TODO: Gửi yêu cầu đầu hàng */
-            },
+            onPressed: () {},
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.player1),
           ),
         ],

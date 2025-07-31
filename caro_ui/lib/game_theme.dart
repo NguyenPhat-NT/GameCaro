@@ -1,27 +1,21 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Màu cho bàn cờ
-  static const Color boardBackground = Color(0xFFF5F5DC); // Màu Be
-  static const Color gridLines = Color(0xFFBDBDBD); // Màu Xám
-
-  // Màu cho người chơi
-  static const Color player1 = Color(0xFFE53935); // Đỏ
-  static const Color player2 = Color(0xFF1E88E5); // Xanh Lam
-  static const Color player3 = Color(0xFF43A047); // Xanh Lá
-  static const Color player4 = Color(0xFFFFB300); // Vàng Hổ Phách
-
-  // Màu giao diện chung
+  static const Color boardBackground = Color(0xFFF5F5DC);
+  static const Color gridLines = Color(0xFFBDBDBD);
+  static const Color player1 = Color(0xFFE53935);
+  static const Color player2 = Color(0xFF1E88E5);
+  static const Color player3 = Color(0xFF43A047);
+  static const Color player4 = Color(0xFFFFB300);
   static const Color primaryText = Color(0xFF212121);
   static const Color secondaryText = Color(0xFF757575);
-  static const Color background = Color(0xFFECEFF1); // Xám nhạt
+  static const Color background = Color(0xFFECEFF1);
 }
 
 final ThemeData gameTheme = ThemeData(
   brightness: Brightness.light,
   primaryColor: AppColors.player2,
   scaffoldBackgroundColor: AppColors.background,
-
   textTheme: const TextTheme(
     headlineSmall: TextStyle(
       fontWeight: FontWeight.bold,
@@ -36,7 +30,6 @@ final ThemeData gameTheme = ThemeData(
       color: Colors.white,
     ),
   ),
-
   elevatedButtonTheme: ElevatedButtonThemeData(
     style: ElevatedButton.styleFrom(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
