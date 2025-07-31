@@ -189,47 +189,39 @@ public class ClientHandler
     {
         if (string.IsNullOrEmpty(jsonString)) return;
         var request = JsonSerializer.Deserialize<ReconnectRequest>(jsonString);
-        if (request == null || request.RoomId == null || request.SessionToken == null) return;
+        if (request?.RoomId == null || request.SessionToken == null) return;
 
         var room = LobbyManager.GetRoom(request.RoomId);
-        if (room == null) return; // Phòng không tồn tại
+        if (room == null) return;
 
         var playerToReconnect = room.Players.FirstOrDefault(p => p.SessionToken == request.SessionToken);
 
         if (playerToReconnect != null && !playerToReconnect.IsConnected)
         {
-            // Log.Information($"Player {playerToReconnect.PlayerName} has reconnected!");
-
-            // Gán lại kết nối mới cho đối tượng Player cũ
+            // ... logic gán lại kết nối ...
             playerToReconnect.ActiveConnection = this;
             this.PlayerData = playerToReconnect;
             this.CurrentRoom = room;
 
-            // 1. Gửi thông báo kết nối lại thành công cho chính người chơi đó
-            // (Bạn có thể gửi lại toàn bộ trạng thái game ở đây nếu cần)
-            var reconnectResult = new ReconnectResult
+            // Tạo tin nhắn GameStateUpdate mới
+            var gameStateUpdate = new GameStateUpdateMessage
             {
-                Type = "RECONNECT_RESULT",
-                Success = true
+                Type = "GAME_STATE_UPDATE",
+                Players = room.Players.Select((p, index) => new PlayerInfo { PlayerName = p.PlayerName, PlayerId = index }).ToList(),
+                Moves = room.MoveHistory,
+                CurrentPlayerId = room.CurrentPlayerIndex
             };
-            await SendMessageAsync(reconnectResult);
 
-            // 2. Gửi thông báo cho những người chơi khác
+            // Gửi toàn bộ trạng thái game cho người chơi vừa kết nối lại
+            await SendMessageAsync(gameStateUpdate);
+
+            // Thông báo cho những người chơi khác rằng người này đã online trở lại
             var notification = new PlayerReconnectedNotification
             {
                 Type = "PLAYER_RECONNECTED",
                 PlayerId = room.Players.IndexOf(playerToReconnect)
             };
-            // Gửi cho tất cả mọi người TRỪ người vừa kết nối lại
             await room.BroadcastMessageAsync(notification, excludePlayer: playerToReconnect);
-
-            // 3. Gửi lại thông báo lượt đi hiện tại cho TẤT CẢ mọi người
-            var turnUpdateNotif = new TurnUpdateNotification
-            {
-                Type = "TURN_UPDATE",
-                NextPlayerId = room.CurrentPlayerIndex
-            };
-            await room.BroadcastMessageAsync(turnUpdateNotif);
         }
     }
     
