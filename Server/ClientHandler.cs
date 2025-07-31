@@ -69,12 +69,12 @@ public class ClientHandler
         finally
         {
             // Thông báo cho phòng game về việc ngắt kết nối
-     // Kiểm tra xem client này có đang trong một ván game không
-    if (this.PlayerData != null && this.CurrentRoom != null && this.CurrentRoom.State == RoomState.Playing)
-    {
-        // Truyền đối tượng Player vào phương thức
-        await this.CurrentRoom.HandlePlayerDisconnection(this.PlayerData);
-    }
+            // Kiểm tra xem client này có đang trong một ván game không
+            if (this.PlayerData != null && this.CurrentRoom != null && this.CurrentRoom.State == RoomState.Playing)
+            {
+                // Truyền đối tượng Player vào phương thức
+                await this.CurrentRoom.HandlePlayerDisconnection(this.PlayerData);
+            }
 
             Console.WriteLine($"Client disconnected: {_client.Client.RemoteEndPoint}");
             _client.Close();
@@ -166,7 +166,7 @@ public class ClientHandler
             // Dùng Task.Run để không block handler hiện tại
             _ = Task.Run(() => room.StartGame());
         }
-}
+    }
     private void HandleMakeMove(string jsonString)
     {
         var request = JsonSerializer.Deserialize<MakeMoveRequest>(jsonString);
@@ -175,30 +175,52 @@ public class ClientHandler
         // Chuyển việc xử lý logic cho GameRoom
         this.CurrentRoom.ProcessPlayerMove(this.PlayerData, request.X, request.Y);
     }
-    private async Task HandleReconnect(string jsonString)
+    private async Task HandleReconnect(string? jsonString)
     {
         var request = JsonSerializer.Deserialize<ReconnectRequest>(jsonString);
-        if (request == null) return;
+        if (request == null || request.RoomId == null || request.SessionToken == null) return;
 
         var room = LobbyManager.GetRoom(request.RoomId);
         if (room == null) return; // Phòng không tồn tại
 
-        // Tìm người chơi trong phòng bằng token
         var playerToReconnect = room.Players.FirstOrDefault(p => p.SessionToken == request.SessionToken);
 
         if (playerToReconnect != null && !playerToReconnect.IsConnected)
         {
-            Console.WriteLine($"Player {playerToReconnect.PlayerName} has reconnected!");
+            // Log.Information($"Player {playerToReconnect.PlayerName} has reconnected!");
 
             // Gán lại kết nối mới cho đối tượng Player cũ
             playerToReconnect.ActiveConnection = this;
             this.PlayerData = playerToReconnect;
             this.CurrentRoom = room;
 
-            // Gửi thông báo kết nối lại thành công cho client
-            // Gửi thông báo cho những người khác rằng người chơi đã online trở lại
-            // ... (Bạn có thể tự thêm các model và logic này)
+            // 1. Gửi thông báo kết nối lại thành công cho chính người chơi đó
+            // (Bạn có thể gửi lại toàn bộ trạng thái game ở đây nếu cần)
+            var reconnectResult = new ReconnectResult
+            {
+                Type = "RECONNECT_RESULT",
+                Success = true
+            };
+            await SendMessageAsync(reconnectResult);
+
+            // 2. Gửi thông báo cho những người chơi khác
+            var notification = new PlayerReconnectedNotification
+            {
+                Type = "PLAYER_RECONNECTED",
+                PlayerId = room.Players.IndexOf(playerToReconnect)
+            };
+            // Gửi cho tất cả mọi người TRỪ người vừa kết nối lại
+            await room.BroadcastMessageAsync(notification, excludePlayer: playerToReconnect);
+
+            // 3. Gửi lại thông báo lượt đi hiện tại cho TẤT CẢ mọi người
+            var turnUpdateNotif = new TurnUpdateNotification
+            {
+                Type = "TURN_UPDATE",
+                NextPlayerId = room.CurrentPlayerIndex
+            };
+            await room.BroadcastMessageAsync(turnUpdateNotif);
         }
     }
+    
 }
 
