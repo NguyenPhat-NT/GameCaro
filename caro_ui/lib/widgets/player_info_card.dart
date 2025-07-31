@@ -39,7 +39,6 @@ class PlayerInfoCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Quân cờ
           Container(
             width: 40,
             height: 40,
@@ -49,7 +48,6 @@ class PlayerInfoCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          // Tên người chơi
           Text(
             player.name,
             style: Theme.of(
