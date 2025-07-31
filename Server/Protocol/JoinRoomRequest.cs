@@ -4,8 +4,8 @@ using System.Text.Json.Serialization;
 public class JoinRoomRequest : BaseMessage
 {
     [JsonPropertyName("PlayerName")]
-    public string PlayerName { get; set; }
+    public string? PlayerName { get; set; }
 
     [JsonPropertyName("RoomId")]
-    public string RoomId { get; set; }
+    public string? RoomId { get; set; }
 }

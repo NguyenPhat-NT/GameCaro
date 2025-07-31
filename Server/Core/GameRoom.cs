@@ -16,6 +16,7 @@ public class GameRoom
 {
     public string RoomId { get; }
     public List<Player> Players { get; } = new List<Player>();
+    public List<MoveInfo> MoveHistory { get; } = new List<MoveInfo>();
 
     // Thuộc tính mới
     public RoomState State { get; private set; } = RoomState.Waiting;
@@ -104,6 +105,8 @@ public async Task BroadcastMessageAsync(BaseMessage message, Player? excludePlay
         // Gán PlayerId (0, 1, 2, hoặc 3) vào ô. Chú ý: Ta sẽ cộng 1 để phân biệt với ô trống (0).
         this.Board[x, y] = this.CurrentPlayerIndex + 1;
         _moveCount++;
+
+        MoveHistory.Add(new MoveInfo { X = x, Y = y, PlayerId = this.CurrentPlayerIndex });
 
         // 3. Thông báo cho mọi người về nước đi mới
         var boardUpdateNotif = new BoardUpdateNotification

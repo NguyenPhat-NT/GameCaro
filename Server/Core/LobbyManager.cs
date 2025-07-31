@@ -23,7 +23,7 @@ public static class LobbyManager
         return room;
     }
 
-    public static GameRoom GetRoom(string roomId)
+    public static GameRoom? GetRoom(string roomId)
     {
         _rooms.TryGetValue(roomId, out var room);
         return room;
