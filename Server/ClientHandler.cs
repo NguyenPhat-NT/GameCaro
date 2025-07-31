@@ -123,11 +123,20 @@ public class ClientHandler
     private async Task HandleJoinRoom(string jsonString)
     {
         var request = JsonSerializer.Deserialize<JoinRoomRequest>(jsonString);
-        if (request == null) return;
+    // Bắt đầu khối kiểm tra an toàn
+    if (request?.RoomId == null || request.PlayerName == null)
+    {
+        return; // Dừng lại nếu thông tin không hợp lệ
+    }
 
-        var room = LobbyManager.GetRoom(request.RoomId.ToUpper());
+    var room = LobbyManager.GetRoom(request.RoomId);
+    if (room == null)
+    {
+        // Gửi tin nhắn lỗi về cho client nếu cần
+        return; // Dừng lại nếu không tìm thấy phòng
+    }
+        // Kết thúc khối kiểm tra
 
-        // ... phần kiểm tra phòng không tồn tại, phòng đầy/đang chơi giữ nguyên ...
 
         // 3. Xử lý khi vào phòng thành công
         this.CurrentRoom = room;
@@ -169,14 +178,16 @@ public class ClientHandler
     }
     private void HandleMakeMove(string jsonString)
     {
+        if (jsonString == null) return;
         var request = JsonSerializer.Deserialize<MakeMoveRequest>(jsonString);
-        if (request == null || this.CurrentRoom == null) return;
+        if (request == null || this.CurrentRoom == null || this.PlayerData == null) return;
 
         // Chuyển việc xử lý logic cho GameRoom
         this.CurrentRoom.ProcessPlayerMove(this.PlayerData, request.X, request.Y);
     }
     private async Task HandleReconnect(string? jsonString)
     {
+        if (string.IsNullOrEmpty(jsonString)) return;
         var request = JsonSerializer.Deserialize<ReconnectRequest>(jsonString);
         if (request == null || request.RoomId == null || request.SessionToken == null) return;
 

@@ -94,6 +94,7 @@ public async Task BroadcastMessageAsync(BaseMessage message, Player? excludePlay
     public void ProcessPlayerMove(Player player, int x, int y)
     {
         // 1. Xác thực
+        if (this.Board == null) return;
         if (this.State != RoomState.Playing) return; // Game chưa bắt đầu
         if (this.Players[this.CurrentPlayerIndex] != player) return; // Không phải lượt của người chơi này
         if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) return; // Tọa độ ngoài bàn cờ
@@ -159,6 +160,7 @@ public async Task BroadcastMessageAsync(BaseMessage message, Player? excludePlay
     }
     private bool CheckWinCondition(int lastX, int lastY)
     {
+        if (this.Board == null) return false;
         int playerMark = this.Board[lastX, lastY]; // Lấy dấu của người chơi (1-4)
         if (playerMark == 0) return false;
 

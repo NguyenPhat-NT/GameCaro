@@ -5,6 +5,6 @@ using System.Text.Json.Serialization;
 public class RoomCreatedResponse : BaseMessage
 {
     [JsonPropertyName("RoomId")]
-    public string RoomId { get; set; }
-    public string SessionToken { get; set; }
+    public string? RoomId { get; set; }
+    public string? SessionToken { get; set; }
 }
