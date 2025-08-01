@@ -84,9 +84,12 @@ public async Task BroadcastMessageAsync(BaseMessage message, Player? excludePlay
         var notification = new GameStartNotification
         {
             Type = "GAME_START",
-            BoardSize = BOARD_SIZE,
-            Players = playerInfoList,
-            StartingPlayerId = this.CurrentPlayerIndex
+            Payload = new GameStartPayload
+            {
+                BoardSize = BOARD_SIZE,
+                Players = playerInfoList,
+                StartingPlayerId = this.CurrentPlayerIndex
+            }
         };
 
         // Dùng Task.Run để không block luồng hiện tại
