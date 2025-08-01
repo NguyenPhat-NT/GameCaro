@@ -114,9 +114,11 @@ public class ClientHandler
         var response = new RoomCreatedResponse
         {
             Type = "ROOM_CREATED",
-            RoomId = room.RoomId,
-            // Quan trọng: Gửi SessionToken về cho client ngay khi tạo phòng
-            SessionToken = newPlayer.SessionToken
+            Payload = new RoomCreatedPayload
+            {
+                RoomId = room.RoomId,
+                SessionToken = newPlayer.SessionToken
+            }
         };
         _ = SendMessageAsync(response);
     }
@@ -147,8 +149,11 @@ public class ClientHandler
         var notification = new PlayerJoinedNotification
         {
             Type = "PLAYER_JOINED",
-            PlayerName = newPlayer.PlayerName,
-            PlayerId = room.Players.Count
+            Payload = new PlayerJoinedPayload
+            {
+                PlayerName = newPlayer.PlayerName,
+                PlayerId = room.Players.Count
+            }
         };
         await room.BroadcastMessageAsync(notification);
 
@@ -162,10 +167,13 @@ public class ClientHandler
         var joinResult = new JoinRoomResult
         {
             Type = "JOIN_RESULT",
-            Success = true,
-            RoomId = room.RoomId,
-            Players = existingPlayers, // Gửi danh sách người chơi cũ
-            SessionToken = newPlayer.SessionToken
+            Payload = new JoinResultPayload
+            {
+                Success = true,
+                RoomId = room.RoomId,
+                Players = existingPlayers,
+                SessionToken = newPlayer.SessionToken
+            }
         };
         await SendMessageAsync(joinResult);
 
