@@ -5,6 +5,14 @@ class PlayerInfoCard extends StatelessWidget {
   final Player player;
   final bool isMyTurn;
 
+  // 1. Thêm danh sách màu vào trong widget, tương tự như BoardPainter
+  final List<Color> playerColors = const [
+    Colors.red,
+    Colors.blue,
+    Colors.green,
+    Colors.yellow,
+  ];
+
   const PlayerInfoCard({
     super.key,
     required this.player,
@@ -13,6 +21,10 @@ class PlayerInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Lấy màu của người chơi hiện tại từ danh sách màu
+    final currentPlayerColor =
+        playerColors[player.playerId % playerColors.length];
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -20,13 +32,15 @@ class PlayerInfoCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isMyTurn ? player.color : Colors.transparent,
+          // 2. Sửa `player.color` thành `currentPlayerColor`
+          color: isMyTurn ? currentPlayerColor : Colors.transparent,
           width: 3,
         ),
         boxShadow: [
           if (isMyTurn)
             BoxShadow(
-              color: player.color.withOpacity(0.5),
+              // 3. Sửa `player.color` thành `currentPlayerColor`
+              color: currentPlayerColor.withOpacity(0.5),
               blurRadius: 12,
               spreadRadius: 2,
             ),
@@ -43,13 +57,15 @@ class PlayerInfoCard extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: player.color,
+              // 4. Sửa `player.color` thành `currentPlayerColor`
+              color: currentPlayerColor,
               shape: BoxShape.circle,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            player.name,
+            // 5. Sửa `player.name` thành `player.playerName`
+            player.playerName,
             style: Theme.of(
               context,
             ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
