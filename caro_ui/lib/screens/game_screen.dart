@@ -5,10 +5,13 @@ import '../widgets/player_info_card.dart';
 import '../widgets/game_board.dart';
 import '../services/game_service.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../services/game_service.dart';
 
 class GameScreen extends StatelessWidget {
   const GameScreen({super.key});
-  final int boardSize = 30;
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +41,7 @@ class GameScreen extends StatelessWidget {
                     _buildPlayersColumn(context, gameService, [0, 1]),
                     Expanded(
                       child: GameBoard(
-                        size: boardSize,
+                        size: gameService.boardSize, // Lấy từ service
                         moves: gameService.moves,
                         players: gameService.players,
                         onMoveMade: (x, y) {
@@ -67,8 +70,8 @@ class GameScreen extends StatelessWidget {
 
   Widget _buildTopInfoBar(BuildContext context, GameService gameService) {
     final currentPlayer = gameService.players.firstWhere(
-      (p) => p.id == gameService.currentPlayerId,
-      orElse: () => Player(id: -1, name: "...", color: Colors.grey),
+      (p) => p.playerId == gameService.currentPlayerId,
+      orElse: () => Player(playerId: -1, playerName: "..."),
     );
 
     return Padding(
@@ -81,10 +84,8 @@ class GameScreen extends StatelessWidget {
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           Text(
-            "Lượt của: ${currentPlayer.name}",
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(color: currentPlayer.color),
+            "Lượt của: ${currentPlayer.playerName}",
+            style: Theme.of(context).textTheme.headlineSmall,
           ),
           IconButton(icon: const Icon(Icons.menu), onPressed: () {}),
         ],
@@ -99,17 +100,16 @@ class GameScreen extends StatelessWidget {
   ) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
-      children:
-          playerIndexes.map((index) {
-            if (index < gameService.players.length) {
-              final player = gameService.players[index];
-              return PlayerInfoCard(
-                player: player,
-                isMyTurn: player.id == gameService.currentPlayerId,
-              );
-            }
-            return const SizedBox(width: 100, height: 100); // Placeholder
-          }).toList(),
+      children: playerIndexes.map((index) {
+        if (index < gameService.players.length) {
+          final player = gameService.players[index];
+          return PlayerInfoCard(
+            player: player,
+            isMyTurn: player.playerId == gameService.currentPlayerId,
+          );
+        }
+        return const SizedBox(width: 100, height: 100); // Placeholder
+      }).toList(),
     );
   }
 

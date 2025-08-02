@@ -1,29 +1,29 @@
 import 'package:flutter/material.dart';
-import 'game_theme.dart';
-import 'services/game_service.dart';
-import 'screens/lobby_screen.dart';
 import 'package:provider/provider.dart';
+import 'services/game_service.dart';
+import 'services/connection_screen.dart';
 
 void main() {
   runApp(
     ChangeNotifierProvider(
       create: (context) => GameService(),
-      child: const CaroGameApp(),
+      child: const MyApp(),
     ),
   );
 }
 
-class CaroGameApp extends StatelessWidget {
-  const CaroGameApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Game Caro 4 Người',
-      theme: gameTheme,
-      // Bắt đầu với màn hình chờ (Lobby)
-      home: const LobbyScreen(),
-      debugShowCheckedModeBanner: false,
+      title: 'Caro Game',
+      theme: ThemeData(
+        // Bạn có thể thêm theme tùy chỉnh ở đây
+        primarySwatch: Colors.blue,
+      ),
+      home: ConnectionScreen(),
     );
   }
 }

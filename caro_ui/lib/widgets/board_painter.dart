@@ -19,6 +19,12 @@ class BoardPainter extends CustomPainter {
     final double width = size.width;
     final double height = size.height;
     final double cellSize = width / boardSize;
+    final List<Color> playerColors = [
+      Colors.red,
+      Colors.blue,
+      Colors.green,
+      Colors.yellow,
+    ];
 
     final gridPaint =
         Paint()
@@ -40,8 +46,9 @@ class BoardPainter extends CustomPainter {
 
     // Vẽ các quân cờ
     for (final move in moves) {
-      final player = players.firstWhere((p) => p.id == move.playerId);
-      final piecePaint = Paint()..color = player.color;
+      // Xác định màu quân cờ dựa trên ID người chơi của nước đi
+      final stonePaint =
+          Paint()..color = playerColors[move.playerId % playerColors.length];
 
       final double centerX = (move.x + 0.5) * cellSize;
       final double centerY = (move.y + 0.5) * cellSize;
@@ -54,7 +61,7 @@ class BoardPainter extends CustomPainter {
         Paint()..color = Colors.black.withOpacity(0.3),
       );
       // Vẽ quân cờ
-      canvas.drawCircle(Offset(centerX, centerY), radius, piecePaint);
+      canvas.drawCircle(Offset(centerX, centerY), radius, stonePaint);
     }
   }
 
