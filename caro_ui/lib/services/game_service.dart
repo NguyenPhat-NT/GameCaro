@@ -12,6 +12,7 @@ class GameService with ChangeNotifier {
   String? _roomId;
   String? _sessionToken;
   int? _myPlayerId;
+  String? _myPlayerName;
   List<Player> _players = [];
   List<Move> _moves = [];
   int? _currentPlayerId;
@@ -42,7 +43,10 @@ class GameService with ChangeNotifier {
       case 'ROOM_CREATED':
         _roomId = payload['RoomId'];
         _sessionToken = payload['SessionToken'];
-        print("Đã lưu SessionToken: $_sessionToken");
+        _myPlayerId = 0;
+
+        // Tự động thêm người tạo phòng vào danh sách
+        _players = [Player(playerId: 0, playerName: _myPlayerName ?? "Bạn")];
         break;
 
       case 'JOIN_RESULT':
@@ -104,6 +108,7 @@ class GameService with ChangeNotifier {
 
   // Các hàm để UI gọi
   void createRoom(String playerName) {
+    _myPlayerName = playerName;
     _networkService.send('CREATE_ROOM', {'PlayerName': playerName});
   }
 
