@@ -24,7 +24,7 @@ public class GameRoom
     public int CurrentPlayerIndex { get; private set; }
     private int _moveCount = 0;
 
-    private const int BOARD_SIZE = 20; // Kích thước bàn cờ [cite: 37]
+    private const int BOARD_SIZE = 30; // Kích thước bàn cờ [cite: 37]
 
     public GameRoom(string roomId)
     {
@@ -78,7 +78,7 @@ public async Task BroadcastMessageAsync(BaseMessage message, Player? excludePlay
 
         // 4. Chuẩn bị và gửi thông báo GAME_START
         var playerInfoList = Players
-            .Select((player, index) => new PlayerInfo { PlayerName = player.PlayerName, PlayerId = index })
+            .Select((player, index) => new PlayerInfo { PlayerName = player.PlayerName, PlayerId = index, SessionToken = player.SessionToken })
             .ToList();
 
         var notification = new GameStartNotification
@@ -115,22 +115,29 @@ public async Task BroadcastMessageAsync(BaseMessage message, Player? excludePlay
         var boardUpdateNotif = new BoardUpdateNotification
         {
             Type = "BOARD_UPDATE",
-            X = x,
-            Y = y,
-            PlayerId = this.CurrentPlayerIndex
+            Payload = new BoardUpdatePayload
+            {
+                X = x,
+                Y = y,
+                PlayerId = this.CurrentPlayerIndex
+            }
         };
         _ = BroadcastMessageAsync(boardUpdateNotif);
 
         // 4. Kiểm tra thắng
         if (CheckWinCondition(x, y))
+{
+    this.State = RoomState.Finished;
+    var gameOverNotif = new GameOverNotification
+    {
+        Type = "GAME_OVER",
+        Payload = new GameOverPayload
         {
-            this.State = RoomState.Finished;
-            var gameOverNotif = new GameOverNotification
-            {
-                Type = "GAME_OVER",
-                WinnerId = this.CurrentPlayerIndex
-            };
-            _ = BroadcastMessageAsync(gameOverNotif);
+            WinnerId = this.CurrentPlayerIndex,
+            IsDraw = false
+        }
+    };
+    _ = BroadcastMessageAsync(gameOverNotif);
             Console.WriteLine($"Game over in room {RoomId}. Winner is Player {this.CurrentPlayerIndex}");
             return; // Dừng lại, không chuyển lượt nữa
         }
@@ -142,7 +149,12 @@ public async Task BroadcastMessageAsync(BaseMessage message, Player? excludePlay
             var gameOverNotif = new GameOverNotification
             {
                 Type = "GAME_OVER",
-                IsDraw = true
+                Payload = new GameOverPayload // Create the payload
+                {
+                    IsDraw = true,
+            // WinnerId can be a default value like -1 for a draw
+                WinnerId = -1 
+                }
             };
             _ = BroadcastMessageAsync(gameOverNotif);
             Console.WriteLine($"Game over in room {RoomId}. It's a draw.");
@@ -160,7 +172,10 @@ public async Task BroadcastMessageAsync(BaseMessage message, Player? excludePlay
         var turnUpdateNotif = new TurnUpdateNotification
         {
             Type = "TURN_UPDATE",
-            NextPlayerId = this.CurrentPlayerIndex
+            Payload = new TurnUpdatePayload
+            {
+                NextPlayerId = this.CurrentPlayerIndex
+            }
         };
         _ = BroadcastMessageAsync(turnUpdateNotif);
     }
@@ -245,12 +260,15 @@ public async Task BroadcastMessageAsync(BaseMessage message, Player? excludePlay
                     this.CurrentPlayerIndex = (this.CurrentPlayerIndex + 1) % this.Players.Count;
                 } while (!this.Players[this.CurrentPlayerIndex].IsConnected);
 
-            // Gửi thông báo lượt đi mới cho tất cả người chơi còn lại
-            var turnUpdateNotif = new TurnUpdateNotification
-            {
-                Type = "TURN_UPDATE",
-                NextPlayerId = this.CurrentPlayerIndex
-            };
+                // Gửi thông báo lượt đi mới cho tất cả người chơi còn lại
+                var turnUpdateNotif = new TurnUpdateNotification
+                {
+                    Type = "TURN_UPDATE",
+                    Payload = new TurnUpdatePayload
+                    {
+                        NextPlayerId = this.CurrentPlayerIndex
+                    }
+                };
             await BroadcastMessageAsync(turnUpdateNotif);
         }
     }

@@ -96,11 +96,13 @@ public class ClientHandler
     }
     private void HandleCreateRoom(string jsonString)
     {
-        var request = JsonSerializer.Deserialize<CreateRoomRequest>(jsonString);
-        if (request == null) return;
+         var message = JsonSerializer.Deserialize<ClientMessage<CreateRoomRequest>>(jsonString);
+    var payload = message?.Payload;
+    if (payload == null || payload.PlayerName == null) return;
+
 
         // 1. Tạo đối tượng Player
-        var newPlayer = new Player(request.PlayerName, this);
+        var newPlayer = new Player(payload.PlayerName, this);
         this.PlayerData = newPlayer; // Gán PlayerData cho ClientHandler này
 
         // 2. Gọi LobbyManager để tạo phòng
@@ -124,14 +126,14 @@ public class ClientHandler
     }
     private async Task HandleJoinRoom(string jsonString)
     {
-        var request = JsonSerializer.Deserialize<JoinRoomRequest>(jsonString);
-    // Bắt đầu khối kiểm tra an toàn
-    if (request?.RoomId == null || request.PlayerName == null)
-    {
-        return; // Dừng lại nếu thông tin không hợp lệ
-    }
+        if (string.IsNullOrEmpty(jsonString)) return;
+        
+            // Thay đổi cách Deserialize
+    var message = JsonSerializer.Deserialize<ClientMessage<JoinRoomRequest>>(jsonString);
+    var payload = message?.Payload;
+    if (payload?.RoomId == null || payload.PlayerName == null) return;
 
-    var room = LobbyManager.GetRoom(request.RoomId);
+    var room = LobbyManager.GetRoom(payload.RoomId);
     if (room == null)
     {
         // Gửi tin nhắn lỗi về cho client nếu cần
@@ -142,7 +144,7 @@ public class ClientHandler
 
         // 3. Xử lý khi vào phòng thành công
         this.CurrentRoom = room;
-        var newPlayer = new Player(request.PlayerName, this);
+        var newPlayer = new Player(payload.PlayerName, this);
         this.PlayerData = newPlayer;
 
         // Thông báo cho người chơi cũ về người mới
@@ -158,7 +160,7 @@ public class ClientHandler
         await room.BroadcastMessageAsync(notification);
 
         // Lấy danh sách người chơi HIỆN TẠI (trước khi thêm người mới)
-        var existingPlayers = room.Players.Select((p, index) => new PlayerInfo { PlayerName = p.PlayerName, PlayerId = index }).ToList();
+        var existingPlayers = room.Players.Select((p, index) => new PlayerInfo { PlayerName = p.PlayerName, PlayerId = index, SessionToken = p.SessionToken }).ToList();
 
         // Thêm người chơi mới vào phòng
         room.AddPlayer(newPlayer);
@@ -186,12 +188,14 @@ public class ClientHandler
     }
     private void HandleMakeMove(string jsonString)
     {
-        if (jsonString == null) return;
-        var request = JsonSerializer.Deserialize<MakeMoveRequest>(jsonString);
-        if (request == null || this.CurrentRoom == null || this.PlayerData == null) return;
+        if (string.IsNullOrEmpty(jsonString)) return;
+
+        var message = JsonSerializer.Deserialize<ClientMessage<MakeMoveRequest>>(jsonString);
+        var payload = message?.Payload;
+        if (payload == null || this.CurrentRoom == null || this.PlayerData == null) return;
 
         // Chuyển việc xử lý logic cho GameRoom
-        this.CurrentRoom.ProcessPlayerMove(this.PlayerData, request.X, request.Y);
+        this.CurrentRoom.ProcessPlayerMove(this.PlayerData, payload.X, payload.Y);
     }
     private async Task HandleReconnect(string? jsonString)
     {

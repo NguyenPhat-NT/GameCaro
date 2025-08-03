@@ -12,6 +12,7 @@ public class PlayerInfo
 {
     public string? PlayerName { get; set; }
     public int PlayerId { get; set; }
+    public string SessionToken { get; internal set; }
 }
 public class ReconnectRequest : BaseMessage
 {

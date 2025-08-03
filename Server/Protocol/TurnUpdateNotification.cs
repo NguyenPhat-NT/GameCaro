@@ -3,6 +3,5 @@ using System.Text.Json.Serialization;
 
 public class TurnUpdateNotification : BaseMessage
 {
-    [JsonPropertyName("NextPlayerId")]
-    public int NextPlayerId { get; set; }
+    public TurnUpdatePayload? Payload { get; set; }
 }
