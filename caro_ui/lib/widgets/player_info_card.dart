@@ -1,77 +1,139 @@
+// caro_ui/lib/widgets/player_info_card.dart
+
 import 'package:flutter/material.dart';
+import '../game_theme.dart';
 import '../models/player_model.dart';
+import '../utils/symbol_painter_util.dart';
 
 class PlayerInfoCard extends StatelessWidget {
   final Player player;
   final bool isMyTurn;
-
-  // 1. Thêm danh sách màu vào trong widget, tương tự như BoardPainter
-  final List<Color> playerColors = const [
-    Colors.red,
-    Colors.blue,
-    Colors.green,
-    Colors.yellow,
-  ];
+  final bool hasSurrendered;
 
   const PlayerInfoCard({
     super.key,
     required this.player,
     required this.isMyTurn,
+    this.hasSurrendered = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Lấy màu của người chơi hiện tại từ danh sách màu
-    final currentPlayerColor =
-        playerColors[player.playerId % playerColors.length];
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          // 2. Sửa `player.color` thành `currentPlayerColor`
-          color: isMyTurn ? currentPlayerColor : Colors.transparent,
-          width: 3,
-        ),
-        boxShadow: [
-          if (isMyTurn)
-            BoxShadow(
-              // 3. Sửa `player.color` thành `currentPlayerColor`
-              color: currentPlayerColor.withOpacity(0.5),
-              blurRadius: 12,
-              spreadRadius: 2,
-            ),
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 5,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
+    return Opacity(
+      opacity: hasSurrendered ? 0.7 : 1.0, // Giảm độ sáng một chút khi đầu hàng
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
         children: [
-          Container(
-            width: 40,
-            height: 40,
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            padding: const EdgeInsets.all(8),
+            width: 60,
+            height: 60,
             decoration: BoxDecoration(
-              // 4. Sửa `player.color` thành `currentPlayerColor`
-              color: currentPlayerColor,
+              color: AppColors.parchment.withOpacity(0.8),
               shape: BoxShape.circle,
+              border: Border.all(
+                color: isMyTurn ? AppColors.highlight : AppColors.ink,
+                width: isMyTurn ? 3.0 : 1.5,
+              ),
+              boxShadow: [
+                if (isMyTurn)
+                  BoxShadow(
+                    color: AppColors.highlight.withOpacity(0.7),
+                    blurRadius: 12,
+                    spreadRadius: 2,
+                  ),
+              ],
+            ),
+            child: PlayerSymbol(
+              playerId: player.playerId,
+              playerColor: player.color,
+              size: 36,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            // 5. Sửa `player.name` thành `player.playerName`
-            player.playerName,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
-          ),
+
+          if (player.isHost)
+            Positioned(
+              top: -8,
+              left: -8,
+              child: Icon(Icons.star, color: AppColors.highlight, size: 20),
+            ),
+
+          // === THAY ĐỔI GIAO DIỆN ĐẦU HÀNG Ở ĐÂY ===
+          if (hasSurrendered)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.red[700],
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.white, width: 1.5),
+              ),
+              child: const Text(
+                "OUT",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
+}
+
+class PlayerSymbol extends StatelessWidget {
+  final int playerId;
+  final Color playerColor;
+  final double size;
+
+  const PlayerSymbol({
+    super.key,
+    required this.playerId,
+    required this.playerColor,
+    required this.size,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(
+        painter: _SymbolPainter(playerId: playerId, color: playerColor),
+      ),
+    );
+  }
+}
+
+class _SymbolPainter extends CustomPainter {
+  final int playerId;
+  final Color color;
+
+  _SymbolPainter({required this.playerId, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint =
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0;
+
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2.5;
+
+    SymbolPainterUtil.drawSymbolForPlayer(
+      canvas,
+      playerId,
+      center,
+      radius,
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

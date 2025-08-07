@@ -1,65 +1,80 @@
-import 'package:flutter/material.dart';
-import '../models/player_model.dart';
-import '../game_theme.dart';
-import '../models/move_model.dart';
-import '../widgets/board_painter.dart';
+// lib/widgets/game_board.dart
 
-class GameBoard extends StatelessWidget {
-  final int size;
+import 'package:flutter/material.dart';
+import '../models/move_model.dart';
+import '../models/player_model.dart';
+import 'board_painter.dart';
+
+class GameBoard extends StatefulWidget {
+  final int width;
+  final int height;
   final List<Move> moves;
   final List<Player> players;
   final void Function(int x, int y) onMoveMade;
 
   const GameBoard({
     super.key,
-    required this.size,
+    required this.width,
+    required this.height,
     required this.moves,
     required this.players,
     required this.onMoveMade,
   });
 
   @override
+  State<GameBoard> createState() => _GameBoardState();
+}
+
+class _GameBoardState extends State<GameBoard> {
+  late TransformationController _transformationController;
+
+  @override
+  void initState() {
+    super.initState();
+    _transformationController = TransformationController();
+    // Bạn có thể thêm logic setInitialZoom ở đây nếu muốn
+  }
+
+  @override
+  void dispose() {
+    _transformationController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8.0),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.gridLines.withOpacity(0.5),
-          width: 2,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias, // Cắt các phần vẽ thừa ra ngoài bo tròn
-      child: InteractiveViewer(
-        boundaryMargin: const EdgeInsets.all(20.0),
-        minScale: 0.5,
-        maxScale: 2.0,
-        child: GestureDetector(
-          onTapUp: (details) {
-            // Lấy kích thước của widget
-            final RenderBox box = context.findRenderObject() as RenderBox;
-            final double boardDimension = box.size.width;
-            final double cellSize = boardDimension / size;
+    return InteractiveViewer(
+      transformationController: _transformationController,
+      boundaryMargin: EdgeInsets.zero,
+      minScale: 0.5,
+      maxScale: 4.0,
+      child: GestureDetector(
+        onTapUp: (details) {
+          final RenderBox box = context.findRenderObject() as RenderBox;
+          final Offset localTapPosition = box.globalToLocal(
+            details.globalPosition,
+          );
+          final Offset boardPosition = _transformationController.toScene(
+            localTapPosition,
+          );
 
-            // Tính toán tọa độ (x, y) dựa trên vị trí chạm
-            final Offset localPosition = box.globalToLocal(
-              details.globalPosition,
-            );
-            final int x = (localPosition.dx / cellSize).floor();
-            final int y = (localPosition.dy / cellSize).floor();
+          final double cellWidth = box.size.width / widget.width;
+          final double cellHeight = box.size.height / widget.height;
 
-            // Gọi callback để xử lý nước đi
-            if (x >= 0 && x < size && y >= 0 && y < size) {
-              onMoveMade(x, y);
-            }
-          },
-          child: CustomPaint(
-            size: const Size.square(double.infinity), // Lấp đầy không gian
-            painter: BoardPainter(
-              boardSize: size,
-              moves: moves,
-              players: players,
-            ),
+          final int x = (boardPosition.dx / cellWidth).floor();
+          final int y = (boardPosition.dy / cellHeight).floor();
+
+          if (x >= 0 && x < widget.width && y >= 0 && y < widget.height) {
+            widget.onMoveMade(x, y);
+          }
+        },
+        child: CustomPaint(
+          size: Size.infinite,
+          painter: BoardPainter(
+            boardWidth: widget.width,
+            boardHeight: widget.height,
+            moves: widget.moves,
+            players: widget.players,
           ),
         ),
       ),
