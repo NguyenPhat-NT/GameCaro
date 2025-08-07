@@ -28,4 +28,11 @@ public static class LobbyManager
         _rooms.TryGetValue(roomId, out var room);
         return room;
     }
+     public static void RemoveRoom(string roomId)
+    {
+        if (_rooms.TryRemove(roomId, out _))
+        {
+            Console.WriteLine($"Room {roomId} has been removed.");
+        }
+    }
 }

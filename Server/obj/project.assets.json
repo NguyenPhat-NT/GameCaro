@@ -13,11 +13,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\Tai lieu\\LTM\\tesstCaro\\GameCaro\\Server\\Server.csproj",
+      "projectUniqueName": "D:\\Tai lieu\\LTM\\uploadServer\\GameCaro\\Server\\Server.csproj",
       "projectName": "Server",
-      "projectPath": "D:\\Tai lieu\\LTM\\tesstCaro\\GameCaro\\Server\\Server.csproj",
+      "projectPath": "D:\\Tai lieu\\LTM\\uploadServer\\GameCaro\\Server\\Server.csproj",
       "packagesPath": "C:\\Users\\PhatNT\\.nuget\\packages\\",
-      "outputPath": "D:\\Tai lieu\\LTM\\tesstCaro\\GameCaro\\Server\\obj\\",
+      "outputPath": "D:\\Tai lieu\\LTM\\uploadServer\\GameCaro\\Server\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\PhatNT\\AppData\\Roaming\\NuGet\\NuGet.Config"
