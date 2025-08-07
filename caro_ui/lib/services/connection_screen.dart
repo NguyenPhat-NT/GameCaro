@@ -1,6 +1,6 @@
 import 'package:caro_ui/services/network_service.dart';
 import 'package:flutter/material.dart';
-import 'dart:io'; // Cần thiết cho việc sử dụng Socket sau này
+// Cần thiết cho việc sử dụng Socket sau này
 
 // Giả định bạn sẽ có một màn hình phòng chờ (LobbyScreen) để chuyển đến
 import '../screens/lobby_screen.dart';
@@ -46,7 +46,7 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
     }
     // Sử dụng Singleton để kết nối
     final networkService = NetworkService(); // Lấy thực thể duy nhất
-    bool success = await networkService.connect(ip, port!);
+    bool success = await networkService.connect(ip, port);
 
     if (success) {
       if (mounted) {
