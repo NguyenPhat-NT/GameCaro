@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:caro_ui/widgets/chat_drawer.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
@@ -11,7 +12,7 @@ import '../widgets/player_info_card.dart';
 import '../widgets/game_board.dart';
 import '../models/player_model.dart';
 import '../services/connection_screen.dart';
-
+import '../screens/lobby_screen.dart';
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
 
@@ -28,10 +29,6 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void initState() {
     super.initState();
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final gameService = context.read<GameService>();
@@ -42,14 +39,14 @@ class _GameScreenState extends State<GameScreen> {
 
   @override
   void dispose() {
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
+    // --- BƯỚC 2.2: Xóa các dòng sau ---
+    // SystemChrome.setPreferredOrientations([
+    //   DeviceOrientation.portraitUp,
+    //   DeviceOrientation.portraitDown,
+    // ]);
     _overlayTimer?.cancel();
     super.dispose();
   }
-
   void _showOverlayMessage(
     String message, {
     Duration duration = const Duration(seconds: 2),
@@ -166,6 +163,8 @@ class _GameScreenState extends State<GameScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.woodFrame,
+      // --- THÊM MỚI: Thêm ngăn kéo chat vào Scaffold ---
+      endDrawer: const ChatDrawer(),
       body: SafeArea(
         child: Container(
           color: AppColors.parchment,
@@ -185,11 +184,9 @@ class _GameScreenState extends State<GameScreen> {
                   },
                 ),
               ),
-
-              // === THAY ĐỔI GIAO DIỆN TÊN NGƯỜI CHƠI Ở ĐÂY ===
               _buildPlayerCorners(context, gameService),
-
-              _buildBottomUtilityBar(context, gameService),
+              // --- THAY ĐỔI: Sử dụng widget mới cho các nút điều khiển ---
+              const _GameControlButtons(),
               _buildOverlayIndicator(),
               if (gameService.winnerId != null || gameService.isDraw)
                 _buildWinnerOverlay(context),
@@ -399,7 +396,7 @@ class _GameScreenState extends State<GameScreen> {
                 context.read<GameService>().resetStateForNewConnection();
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(
-                    builder: (context) => const ConnectionScreen(),
+                    builder: (context) => LobbyScreen(),
                   ),
                   (Route<dynamic> route) => false,
                 );
@@ -408,6 +405,61 @@ class _GameScreenState extends State<GameScreen> {
                 "Thoát Phòng",
                 style: TextStyle(color: AppColors.parchment),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+class _GameControlButtons extends StatelessWidget {
+  const _GameControlButtons();
+
+  @override
+  Widget build(BuildContext context) {
+    // Context ở đây đã nằm "bên dưới" Scaffold, nên gọi Scaffold.of() sẽ thành công
+    final gameService = context.read<GameService>();
+
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+        decoration: BoxDecoration(
+          color: AppColors.parchment.withOpacity(0.9),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.ink.withOpacity(0.5)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              "Phòng: ${gameService.roomId ?? '...'}",
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(width: 12),
+            Container(
+              width: 1.5,
+              height: 20,
+              color: AppColors.ink.withOpacity(0.4),
+            ),
+            const SizedBox(width: 4),
+            IconButton(
+              tooltip: "Trò chuyện",
+              icon: const Icon(Icons.chat_bubble_outline),
+              onPressed: () {
+                // Lệnh này giờ sẽ hoạt động bình thường
+                Scaffold.of(context).openEndDrawer();
+              },
+            ),
+            IconButton(
+              tooltip: "Đầu hàng",
+              icon: const Icon(Icons.flag_outlined),
+              onPressed: () {
+                // Cần truy cập _onSurrenderPressed, chúng ta có thể làm như sau:
+                // Tìm state của _GameScreenState và gọi hàm
+                context.findAncestorStateOfType<_GameScreenState>()?._onSurrenderPressed();
+              },
             ),
           ],
         ),
