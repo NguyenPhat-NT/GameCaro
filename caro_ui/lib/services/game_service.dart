@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'network_service.dart';
 import '../models/player_model.dart';
+import '../models/chat_message_model.dart';
 import '../models/move_model.dart';
 import '../game_theme.dart';
 
@@ -25,9 +26,9 @@ class GameService with ChangeNotifier {
   int? _winnerId;
   bool _isDraw = false;
   bool _shouldNavigateHome = false;
-  final Set<int> _surrenderedPlayerIds =
-      {}; // <<< THÊM MỚI: Theo dõi người chơi đã đầu hàng
-
+  final Set<int> _surrenderedPlayerIds = {}; // <<< THÊM MỚI: Theo dõi người chơi đã đầu hàng
+  List<ChatMessage> _chatMessages = [];
+  List<ChatMessage> get chatMessages => _chatMessages;
   // Getters
   String? get roomId => _roomId;
   List<Player> get players => _players;
@@ -60,6 +61,9 @@ class GameService with ChangeNotifier {
     _isDraw = false;
     _shouldNavigateHome = false;
     _surrenderedPlayerIds.clear();
+    _chatMessages.clear();
+    _surrenderedPlayerIds.clear(); // <-- THÊM DÒNG NÀY
+    // Không gọi notifyListeners() ở đây để tránh lỗi khi đang build UI
   }
 
   void _handleServerMessage(Map<String, dynamic> message) {
@@ -73,9 +77,9 @@ class GameService with ChangeNotifier {
         _isGameStarted = true;
         _moves.clear();
         _winnerId = null;
+        
         _isDraw = false;
-        _surrenderedPlayerIds
-            .clear(); // <<< THÊM MỚI: Reset khi game mới bắt đầu
+        _surrenderedPlayerIds.clear(); // <<< THÊM MỚI: Reset khi game mới bắt đầu
         _currentPlayerId = payload['StartingPlayerId'];
         _boardSize = payload['BoardSize'] as int;
         final playerList = payload['Players'] as List;
@@ -98,7 +102,20 @@ class GameService with ChangeNotifier {
           _surrenderedPlayerIds.add(playerId);
         }
         break;
+      case 'PLAYER_LEFT': // Người chơi khác thoát phòng [cite: 39]
+        final playerId = payload['PlayerId'] as int;
+        _players.removeWhere((p) => p.playerId == playerId);
+        break;
 
+      case 'LEAVE_ROOM_SUCCESS': // Bạn đã thoát phòng thành công [cite: 35]
+      case 'ROOM_CLOSED': // Chủ phòng thoát, phòng bị đóng [cite: 43]
+        _shouldNavigateHome = true;
+        break;
+
+      case 'PLAYER_SURRENDERED': // Một người chơi đã đầu hàng [cite: 51]
+        final playerId = payload['PlayerId'] as int;
+        _surrenderedPlayerIds.add(playerId);
+        break;
       // ... các case khác giữ nguyên
       case 'ROOM_CREATED':
         _roomId = payload['RoomId'];
@@ -140,6 +157,19 @@ class GameService with ChangeNotifier {
         final newPlayer = Player.fromJson(payload);
         if (!_players.any((p) => p.playerId == newPlayer.playerId)) {
           _players.add(newPlayer);
+        }
+        break;
+      case 'CHAT_MESSAGE_RECEIVED':
+        final newChatMessage = ChatMessage.fromJson(payload);
+        _chatMessages.add(newChatMessage);
+        break;
+      case 'GAME_STATE_UPDATE':
+        // ... (xử lý Players, Moves,...)
+        if (payload.containsKey('ChatHistory')) {
+          final chatHistoryList = payload['ChatHistory'] as List;
+          _chatMessages = chatHistoryList
+              .map((chat) => ChatMessage.fromJson(chat as Map<String, dynamic>))
+              .toList();
         }
         break;
       case 'BOARD_UPDATE':
@@ -198,10 +228,20 @@ class GameService with ChangeNotifier {
       _networkService.send('LEAVE_ROOM', {});
     }
   }
-
   @override
   void dispose() {
     _messageSubscription?.cancel();
     super.dispose();
   }
+  void sendChatMessage(String message) {
+    if (message.trim().isNotEmpty) {
+      _networkService.send('SEND_CHAT_MESSAGE', {'Message': message});
+    }
+  }
+  void startGameEarly() {
+    if (_players.any((p) => p.playerId == _myPlayerId && p.isHost)) {
+       _networkService.send('START_GAME_EARLY', {});
+    }
+  }
+
 }

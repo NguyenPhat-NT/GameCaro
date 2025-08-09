@@ -1,16 +1,24 @@
 // caro_ui/lib/main.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // <-- Thư viện cần thiết
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'services/game_service.dart';
-import 'services/connection_screen.dart'; // Đường dẫn đúng
+import 'services/connection_screen.dart';
 import 'game_theme.dart';
 
-void main() {
-  // THÊM DÒNG LỆNH QUAN TRỌNG NÀY
+// --- THAY ĐỔI 1: Thêm async và các lệnh khóa màn hình ---
+Future<void> main() async {
+  // Đảm bảo các thành phần Flutter đã sẵn sàng
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Khóa ứng dụng chỉ ở chế độ ngang
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
+  ]);
 
   runApp(
     ChangeNotifierProvider(

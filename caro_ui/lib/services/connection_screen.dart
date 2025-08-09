@@ -1,9 +1,12 @@
-import 'package:caro_ui/services/network_service.dart';
-import 'package:flutter/material.dart';
-// Cần thiết cho việc sử dụng Socket sau này
+// File: caro_ui/lib/services/connection_screen.dart
 
-// Giả định bạn sẽ có một màn hình phòng chờ (LobbyScreen) để chuyển đến
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
 import '../screens/lobby_screen.dart';
+import 'network_service.dart';
+import 'game_service.dart';
+import '../game_theme.dart';
 
 class ConnectionScreen extends StatefulWidget {
   const ConnectionScreen({super.key});
@@ -13,19 +16,15 @@ class ConnectionScreen extends StatefulWidget {
 }
 
 class _ConnectionScreenState extends State<ConnectionScreen> {
-  // Sử dụng TextEditingController để lấy giá trị từ TextField
   final TextEditingController _ipController = TextEditingController();
   final TextEditingController _portController = TextEditingController();
-
-  // Biến để quản lý trạng thái đang kết nối, giúp hiển thị loading
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    // Đặt giá trị mặc định từ tài liệu API để tiện cho việc test
-    _ipController.text = '103.157.205.146'; // IP VPS từ tài liệu [cite: 5]
-    _portController.text = '8888'; // Port từ tài liệu [cite: 6]
+    _ipController.text = '103.157.205.146';
+    _portController.text = '8888';
   }
 
   void _connectToServer() async {
@@ -33,31 +32,31 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
       _isLoading = true;
     });
 
-    final String ip = _ipController.text;
-    final int? port = int.tryParse(_portController.text);
+    // Reset lại toàn bộ state cũ trước khi kết nối mới
+    context.read<GameService>().resetStateForNewConnection();
+
+    final String ip = _ipController.text.trim();
+    final int? port = int.tryParse(_portController.text.trim());
 
     if (port == null) {
-      // Hiển thị lỗi nếu port không hợp lệ
-      _showErrorDialog("Lỗi", "Port phải là một con số.");
-      setState(() {
-        _isLoading = false;
-      });
+      _showErrorDialog("Lỗi", "Cổng (Port) phải là một con số.");
+      setState(() { _isLoading = false; });
       return;
     }
-    // Sử dụng Singleton để kết nối
-    final networkService = NetworkService(); // Lấy thực thể duy nhất
+
+    final networkService = NetworkService();
     bool success = await networkService.connect(ip, port);
 
+    if (!mounted) return;
+
     if (success) {
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => LobbyScreen()),
-        );
-      }
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => LobbyScreen()),
+      );
     } else {
       _showErrorDialog(
         "Kết nối thất bại",
-        "Không thể kết nối đến server. Vui lòng kiểm tra lại IP/Port và trạng thái server.",
+        "Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại IP/Port và trạng thái máy chủ.",
       );
     }
 
@@ -71,23 +70,22 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
   void _showErrorDialog(String title, String content) {
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text(title),
-            content: Text(content),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text("Đã hiểu"),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.parchment,
+        title: Text(title),
+        content: Text(content),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text("Đã hiểu", style: TextStyle(color: AppColors.ink)),
           ),
+        ],
+      ),
     );
   }
 
   @override
   void dispose() {
-    // Luôn dispose các controller khi widget bị hủy để giải phóng tài nguyên
     _ipController.dispose();
     _portController.dispose();
     super.dispose();
@@ -95,52 +93,59 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
-      appBar: AppBar(title: const Text("Kết nối đến Server Caro")),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // TextField cho địa chỉ IP
-            TextField(
-              controller: _ipController,
-              decoration: const InputDecoration(
-                labelText: "Địa chỉ IP Server",
-                hintText: "Ví dụ: 127.0.0.1",
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.phone,
+      backgroundColor: AppColors.woodFrame,
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Container(
+            padding: const EdgeInsets.all(24.0),
+            decoration: BoxDecoration(
+              color: AppColors.parchment,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.ink.withOpacity(0.5), width: 2),
             ),
-            const SizedBox(height: 16),
-
-            // TextField cho Port
-            TextField(
-              controller: _portController,
-              decoration: const InputDecoration(
-                labelText: "Port",
-                hintText: "Ví dụ: 8888",
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 32),
-
-            // Nút bấm hoặc vòng tròn loading
-            _isLoading
-                ? const CircularProgressIndicator()
-                : ElevatedButton(
-                  onPressed: _connectToServer,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 40,
-                      vertical: 15,
-                    ),
-                    textStyle: const TextStyle(fontSize: 16),
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text("CARO ONLINE", style: textTheme.headlineSmall?.copyWith(fontSize: 28)),
+                const SizedBox(height: 24),
+                TextField(
+                  controller: _ipController,
+                  decoration: const InputDecoration(
+                    labelText: "Địa chỉ IP Máy chủ",
+                    border: OutlineInputBorder(),
                   ),
-                  child: const Text("Kết nối"),
+                  keyboardType: TextInputType.phone,
                 ),
-          ],
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _portController,
+                  decoration: const InputDecoration(
+                    labelText: "Cổng",
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 24),
+                _isLoading
+                    ? const CircularProgressIndicator(color: AppColors.ink)
+                    : ElevatedButton(
+                        onPressed: _connectToServer,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.ink,
+                          foregroundColor: AppColors.parchment,
+                          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        child: const Text("Kết nối"),
+                      ),
+              ],
+            ),
+          ),
         ),
       ),
     );

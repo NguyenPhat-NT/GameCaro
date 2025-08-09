@@ -6,7 +6,7 @@ import '../game_theme.dart';
 class Player {
   final String playerName;
   final int playerId;
-  final bool isHost;
+  final bool isHost; 
   final Color color;
 
   Player({
