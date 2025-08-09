@@ -13,38 +13,77 @@ import 'game_screen.dart';
 class LobbyScreen extends StatelessWidget {
   LobbyScreen({super.key});
 
-  final TextEditingController _nameController = TextEditingController(text: "Player");
+  final TextEditingController _nameController = TextEditingController(
+    text: "Player",
+  );
   final TextEditingController _roomIdController = TextEditingController();
 
   void _showJoinRoomDialog(BuildContext context) {
     final gameService = context.read<GameService>();
+    final roomIdController = TextEditingController();
+    final playerName = context.read<GameService>().myPlayerName ?? "Player";
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.parchment,
-        title: const Text("Tham gia phòng"),
-        content: TextField(
-          controller: _roomIdController,
-          decoration: const InputDecoration(hintText: "Nhập mã phòng..."),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text("Hủy", style: TextStyle(color: AppColors.ink)),
+      barrierDismissible: false,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: AppColors.parchment,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
           ),
-          ElevatedButton(
-            onPressed: () {
-              final roomId = _roomIdController.text.trim().toUpperCase();
-              final playerName = _nameController.text.trim();
-              if (roomId.isNotEmpty && playerName.isNotEmpty) {
-                gameService.joinRoom(roomId, playerName);
-                Navigator.of(context).pop();
-              }
-            },
-            child: const Text("Tham gia"),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Bọc TextField và các nút trong một Row
+                  Row(
+                    children: [
+                      // Dùng Expanded để TextField chiếm hết không gian còn lại
+                      Expanded(
+                        child: TextField(
+                          controller: roomIdController,
+                          decoration: const InputDecoration(
+                            labelText: "Nhập mã phòng...",
+                            border: OutlineInputBorder(),
+                          ),
+                          autofocus: true,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      const SizedBox(
+                        width: 8,
+                      ), // Khoảng cách giữa TextField và nút
+                      ElevatedButton(
+                        onPressed: () {
+                          final roomId =
+                              roomIdController.text.trim().toUpperCase();
+                          if (roomId.isNotEmpty && playerName.isNotEmpty) {
+                            gameService.joinRoom(roomId, playerName);
+                            Navigator.of(context).pop();
+                          }
+                        },
+                        child: const Text("Tham gia"),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Nút Hủy có thể đặt riêng ở đây hoặc trong Row trên
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text(
+                      "Hủy",
+                      style: TextStyle(color: AppColors.ink),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -89,9 +128,7 @@ class LobbyScreen extends StatelessWidget {
         automaticallyImplyLeading: false,
       ),
       endDrawer: const ChatDrawer(),
-      body: isInLobby
-          ? _buildLobbyView(context)
-          : _buildInitialView(context),
+      body: isInLobby ? _buildLobbyView(context) : _buildInitialView(context),
     );
   }
 
@@ -103,18 +140,27 @@ class LobbyScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text("Chào mừng tới Caro Online!", style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontSize: 24)),
+            Text(
+              "Chào mừng tới Caro Online!",
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontSize: 24),
+            ),
             const SizedBox(height: 20),
             TextField(
               controller: _nameController,
-              decoration: const InputDecoration(labelText: "Tên người chơi", border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                labelText: "Tên người chơi",
+                border: OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 ElevatedButton(
-                  onPressed: () => gameService.createRoom(_nameController.text.trim()),
+                  onPressed:
+                      () => gameService.createRoom(_nameController.text.trim()),
                   child: const Text('Tạo Phòng Mới'),
                 ),
                 const SizedBox(width: 16),
@@ -139,7 +185,8 @@ class LobbyScreen extends StatelessWidget {
         children: [
           Expanded(
             flex: 2,
-            child: SingleChildScrollView( // <--- Bọc ở đây
+            child: SingleChildScrollView(
+              // <--- Bọc ở đây
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -150,11 +197,13 @@ class LobbyScreen extends StatelessWidget {
               ),
             ),
           ),
-          const VerticalDivider(color: AppColors.woodFrame, thickness: 2, indent: 20, endIndent: 20),
-          Expanded(
-            flex: 3,
-            child: _buildPlayerList(context),
+          const VerticalDivider(
+            color: AppColors.woodFrame,
+            thickness: 2,
+            indent: 20,
+            endIndent: 20,
           ),
+          Expanded(flex: 3, child: _buildPlayerList(context)),
         ],
       ),
     );
@@ -173,7 +222,14 @@ class LobbyScreen extends StatelessWidget {
             Column(
               children: [
                 const Text("MÃ PHÒNG", style: TextStyle(color: Colors.grey)),
-                Text(gameService.roomId!, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 2)),
+                Text(
+                  gameService.roomId!,
+                  style: const TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2,
+                  ),
+                ),
               ],
             ),
             const SizedBox(width: 16),
@@ -197,25 +253,41 @@ class LobbyScreen extends StatelessWidget {
     final players = gameService.players;
     return Column(
       children: [
-        Text("NGƯỜI CHƠI (${players.length}/4)", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        Text(
+          "NGƯỜI CHƠI (${players.length}/4)",
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
         const Divider(),
         Expanded(
-          child: players.isEmpty
-              ? const Center(child: Text("Chưa có ai trong phòng."))
-              : ListView.builder(
-                  itemCount: players.length,
-                  itemBuilder: (context, index) {
-                    final player = players[index];
-                    return Card(
-                      color: AppColors.parchment.withOpacity(0.7),
-                      child: ListTile(
-                        leading: CircleAvatar(backgroundColor: player.color, child: Text('${player.playerId + 1}')),
-                        title: Text(player.playerName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        trailing: player.isHost ? const Icon(Icons.star, color: AppColors.highlight) : null,
-                      ),
-                    );
-                  },
-                ),
+          child:
+              players.isEmpty
+                  ? const Center(child: Text("Chưa có ai trong phòng."))
+                  : ListView.builder(
+                    itemCount: players.length,
+                    itemBuilder: (context, index) {
+                      final player = players[index];
+                      return Card(
+                        color: AppColors.parchment.withOpacity(0.7),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: player.color,
+                            child: Text('${player.playerId + 1}'),
+                          ),
+                          title: Text(
+                            player.playerName,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          trailing:
+                              player.isHost
+                                  ? const Icon(
+                                    Icons.star,
+                                    color: AppColors.highlight,
+                                  )
+                                  : null,
+                        ),
+                      );
+                    },
+                  ),
         ),
       ],
     );
