@@ -26,7 +26,8 @@ class GameService with ChangeNotifier {
   int? _winnerId;
   bool _isDraw = false;
   bool _shouldNavigateHome = false;
-  final Set<int> _surrenderedPlayerIds = {}; // <<< THÊM MỚI: Theo dõi người chơi đã đầu hàng
+  final Set<int> _surrenderedPlayerIds =
+      {}; // <<< THÊM MỚI: Theo dõi người chơi đã đầu hàng
   List<ChatMessage> _chatMessages = [];
   List<ChatMessage> get chatMessages => _chatMessages;
   // Getters
@@ -37,6 +38,7 @@ class GameService with ChangeNotifier {
   bool get isGameStarted => _isGameStarted;
   int get boardSize => _boardSize;
   int? get myPlayerId => _myPlayerId;
+  String? get myPlayerName => _myPlayerName;
   int? get winnerId => _winnerId;
   bool get isDraw => _isDraw;
   bool get shouldNavigateHome => _shouldNavigateHome;
@@ -77,9 +79,10 @@ class GameService with ChangeNotifier {
         _isGameStarted = true;
         _moves.clear();
         _winnerId = null;
-        
+
         _isDraw = false;
-        _surrenderedPlayerIds.clear(); // <<< THÊM MỚI: Reset khi game mới bắt đầu
+        _surrenderedPlayerIds
+            .clear(); // <<< THÊM MỚI: Reset khi game mới bắt đầu
         _currentPlayerId = payload['StartingPlayerId'];
         _boardSize = payload['BoardSize'] as int;
         final playerList = payload['Players'] as List;
@@ -167,9 +170,13 @@ class GameService with ChangeNotifier {
         // ... (xử lý Players, Moves,...)
         if (payload.containsKey('ChatHistory')) {
           final chatHistoryList = payload['ChatHistory'] as List;
-          _chatMessages = chatHistoryList
-              .map((chat) => ChatMessage.fromJson(chat as Map<String, dynamic>))
-              .toList();
+          _chatMessages =
+              chatHistoryList
+                  .map(
+                    (chat) =>
+                        ChatMessage.fromJson(chat as Map<String, dynamic>),
+                  )
+                  .toList();
         }
         break;
       case 'BOARD_UPDATE':
@@ -228,20 +235,22 @@ class GameService with ChangeNotifier {
       _networkService.send('LEAVE_ROOM', {});
     }
   }
+
   @override
   void dispose() {
     _messageSubscription?.cancel();
     super.dispose();
   }
+
   void sendChatMessage(String message) {
     if (message.trim().isNotEmpty) {
       _networkService.send('SEND_CHAT_MESSAGE', {'Message': message});
     }
   }
+
   void startGameEarly() {
     if (_players.any((p) => p.playerId == _myPlayerId && p.isHost)) {
-       _networkService.send('START_GAME_EARLY', {});
+      _networkService.send('START_GAME_EARLY', {});
     }
   }
-
 }
