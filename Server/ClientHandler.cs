@@ -57,6 +57,9 @@ public class ClientHandler
                     case "SURRENDER":
                         await HandleSurrender();
                         break;
+                    case "FIND_MATCH":
+                        await HandleFindMatch(jsonString);
+                        break;
 
                     // ================================================================
                     // THÊM CASE MỚI ĐỂ XỬ LÝ TIN NHẮN CHAT
@@ -193,7 +196,7 @@ public class ClientHandler
         await room.BroadcastMessageAsync(notification);
 
         // Lấy danh sách người chơi hiện tại để gửi cho người mới
-        var existingPlayers = room.Players.Select((p, index) => new PlayerInfo { PlayerName = p.PlayerName, PlayerId = index, SessionToken = p.SessionToken, IsHost = p.IsHost}).ToList();
+        var existingPlayers = room.Players.Select((p, index) => new PlayerInfo { PlayerName = p.PlayerName, PlayerId = index, SessionToken = p.SessionToken, IsHost = p.IsHost }).ToList();
 
         // Thêm người chơi mới vào phòng
         room.AddPlayer(newPlayer);
@@ -301,5 +304,67 @@ public class ClientHandler
 
         // Ủy quyền cho GameRoom
         this.CurrentRoom.StartGameEarly(this.PlayerData);
+    }
+    private async Task HandleFindMatch(string jsonString)
+    {
+        var message = JsonSerializer.Deserialize<ClientMessage<FindMatchPayload>>(jsonString);
+        var payload = message?.Payload;
+        if (string.IsNullOrEmpty(payload?.PlayerName)) return;
+
+        // 1. Tạo đối tượng Player
+        var newPlayer = new Player(payload.PlayerName, this);
+        this.PlayerData = newPlayer;
+
+        // 2. Gọi LobbyManager để tìm hoặc tạo phòng
+        var room = LobbyManager.FindOrCreateRoomForPlayer(newPlayer);
+        this.CurrentRoom = room;
+
+        // 3. Tái sử dụng logic Join Room:
+        //    - Gửi thông báo cho người cũ
+        //    - Gửi kết quả cho người mới
+        //    - Thêm người mới vào phòng
+
+        // Gửi thông báo cho những người chơi cũ về người mới vào
+        var notification = new PlayerJoinedNotification
+        {
+            Type = "PLAYER_JOINED",
+            Payload = new PlayerJoinedPayload
+            {
+                PlayerName = newPlayer.PlayerName,
+                PlayerId = room.Players.Count
+            }
+        };
+        await room.BroadcastMessageAsync(notification);
+
+        // Chuẩn bị và gửi kết quả cho người chơi mới
+        var existingPlayers = room.Players.Select((p, index) => new PlayerInfo
+        {
+            PlayerName = p.PlayerName,
+            PlayerId = index,
+            SessionToken = p.SessionToken,
+            IsHost = p.IsHost
+        }).ToList();
+
+        var joinResult = new JoinRoomResult
+        {
+            Type = "JOIN_RESULT",
+            Payload = new JoinResultPayload
+            {
+                Success = true,
+                RoomId = room.RoomId,
+                Players = existingPlayers,
+                SessionToken = newPlayer.SessionToken
+            }
+        };
+        await SendMessageAsync(joinResult);
+
+        // Thêm người chơi mới vào phòng
+        room.AddPlayer(newPlayer);
+
+        // Kiểm tra và bắt đầu game nếu đủ người
+        if (room.Players.Count == 4)
+        {
+            _ = Task.Run(() => room.StartGame());
+        }
     }
 }
