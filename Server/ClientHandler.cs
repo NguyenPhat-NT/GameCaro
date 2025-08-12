@@ -50,6 +50,9 @@ public class ClientHandler
                     case "START_GAME_EARLY":
                         HandleStartGameEarly();
                         break;
+                    case "GET_ROOM_LIST":
+                        await HandleGetRoomList();
+                        break;
 
                     case "MAKE_MOVE":
                         HandleMakeMove(jsonString);
@@ -366,5 +369,23 @@ public class ClientHandler
         {
             _ = Task.Run(() => room.StartGame());
         }
+    }
+    private async Task HandleGetRoomList()
+    {
+        // 1. Gọi LobbyManager để lấy danh sách phòng
+        var rooms = LobbyManager.GetAvailableRooms();
+
+        // 2. Tạo gói tin phản hồi
+        var response = new RoomListUpdateResponse
+        {
+            Type = "ROOM_LIST_UPDATE",
+            Payload = new RoomListUpdatePayload
+            {
+                Rooms = rooms
+            }
+        };
+
+        // 3. Gửi danh sách về cho client đã yêu cầu
+        await SendMessageAsync(response);
     }
 }
