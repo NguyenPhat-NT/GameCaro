@@ -120,7 +120,7 @@ public class GameRoom
         this.CurrentPlayerIndex = 0;
 
         var playerInfoList = Players
-            .Select((player, index) => new PlayerInfo { PlayerName = player.PlayerName, PlayerId = index, SessionToken = player.SessionToken, IsHost = player.IsHost})
+            .Select((player, index) => new PlayerInfo { PlayerName = player.PlayerName, PlayerId = index, SessionToken = player.SessionToken, IsHost = player.IsHost })
             .ToList();
 
         var notification = new GameStartNotification
@@ -160,37 +160,18 @@ public class GameRoom
         };
         _ = BroadcastMessageAsync(boardUpdateNotif);
 
+        // Thay đổi ở phần kiểm tra thắng/hòa
         if (CheckWinCondition(x, y))
         {
-            this.State = RoomState.Finished;
-            var gameOverNotif = new GameOverNotification
-            {
-                Type = "GAME_OVER",
-                Payload = new GameOverPayload
-                {
-                    WinnerId = this.CurrentPlayerIndex,
-                    IsDraw = false
-                }
-            };
-            _ = BroadcastMessageAsync(gameOverNotif);
-            Console.WriteLine($"Game over in room {RoomId}. Winner is Player {this.CurrentPlayerIndex}");
+            var payload = new GameOverPayload { WinnerId = this.CurrentPlayerIndex, IsDraw = false };
+            await EndGameSequence(payload);
             return;
         }
 
         if (_moveCount >= BOARD_SIZE * BOARD_SIZE)
         {
-            this.State = RoomState.Finished;
-            var gameOverNotif = new GameOverNotification
-            {
-                Type = "GAME_OVER",
-                Payload = new GameOverPayload
-                {
-                    IsDraw = true,
-                    WinnerId = -1
-                }
-            };
-            _ = BroadcastMessageAsync(gameOverNotif);
-            Console.WriteLine($"Game over in room {RoomId}. It's a draw.");
+            var payload = new GameOverPayload { IsDraw = true, WinnerId = -1 };
+            await EndGameSequence(payload);
             return;
         }
 
@@ -231,90 +212,92 @@ public class GameRoom
     }
 
     public async Task HandlePlayerDisconnection(Player disconnectedPlayer)
+{
+    int disconnectedPlayerId = Players.IndexOf(disconnectedPlayer);
+    Console.WriteLine($"Player {disconnectedPlayer.PlayerName} disconnected. Starting 30s timer...");
+
+    var notification = new PlayerDisconnectedNotification
     {
-        int disconnectedPlayerId = Players.IndexOf(disconnectedPlayer);
-        Console.WriteLine($"Player {disconnectedPlayer.PlayerName} disconnected. Starting 30s timer...");
+        Type = "PLAYER_DISCONNECTED",
+        PlayerId = disconnectedPlayerId,
+        ReconnectTime = 30
+    };
+    await BroadcastMessageAsync(notification, excludePlayer: disconnectedPlayer);
 
-        var notification = new PlayerDisconnectedNotification
-        {
-            Type = "PLAYER_DISCONNECTED",
-            PlayerId = disconnectedPlayerId,
-            ReconnectTime = 30
-        };
-        await BroadcastMessageAsync(notification, excludePlayer: disconnectedPlayer);
+    await Task.Delay(30000);
 
-        await Task.Delay(30000);
+    // Sau 30 giây, kiểm tra lại
+    if (disconnectedPlayer.ActiveConnection == null && !disconnectedPlayer.HasLeft)
+    {
+        Console.WriteLine($"Player {disconnectedPlayer.PlayerName} failed to reconnect. Marking as left.");
+        
+        // Đánh dấu người chơi đã rời đi
+        disconnectedPlayer.HasLeft = true;
 
-        // Sau 30 giây, kiểm tra lại
-        if (disconnectedPlayer.ActiveConnection == null && !disconnectedPlayer.HasLeft)
-        {
-            Console.WriteLine($"Player {disconnectedPlayer.PlayerName} failed to reconnect. Marking as left.");
-
-            // BƯỚC SỬA LỖI QUAN TRỌNG: Đánh dấu người chơi đã rời đi
-            disconnectedPlayer.HasLeft = true;
-
-            // KIỂM TRA LẠI ĐIỀU KIỆN THẮNG NGAY LẬP TỨC
-            var activePlayers = Players.Where(p => !p.HasLeft && !p.IsSurrendered).ToList();
-            if (activePlayers.Count == 1)
-            {
-                var winner = activePlayers.First();
-                int winnerId = Players.IndexOf(winner);
-                this.State = RoomState.Finished;
-
-                var gameOverNotif = new GameOverNotification
-                {
-                    Type = "GAME_OVER",
-                    Payload = new GameOverPayload { WinnerId = winnerId, IsDraw = false }
-                };
-                await BroadcastMessageAsync(gameOverNotif);
-                Console.WriteLine($"Game over. Winner by default is {winner.PlayerName}.");
-                return; // Game kết thúc
-            }
-
-            // Nếu game chưa kết thúc và là lượt của người chơi này, chuyển lượt
-            if (this.CurrentPlayerIndex == disconnectedPlayerId)
-            {
-                await AdvanceTurn();
-            }
-        }
+        // --- SỬA LỖI TẠI ĐÂY ---
+        // Thay vì tự gửi GAME_OVER, ta gọi AdvanceTurn. 
+        // AdvanceTurn sẽ tự phát hiện ra người thắng và gọi EndGameSequence.
+        await AdvanceTurn();
     }
+}
     // ================================================================
     // PHƯƠNG THỨC MỚI: XỬ LÝ KHI NGƯỜI CHƠI THOÁT PHÒNG
     // ================================================================
     public async Task HandlePlayerLeaving(Player leavingPlayer)
-{
-    int leavingPlayerId = Players.IndexOf(leavingPlayer);
-    if (leavingPlayerId == -1) return;
-
-    // Kịch bản 1: Người chơi thoát khi đang ở phòng chờ
-    if (this.State == RoomState.Waiting)
     {
-        // Trường hợp 1A: Người thoát là CHỦ PHÒNG -> Hủy phòng
-        if (leavingPlayer.IsHost)
+        int leavingPlayerId = Players.IndexOf(leavingPlayer);
+        if (leavingPlayerId == -1) return;
+
+        // Kịch bản 1: Người chơi thoát khi đang ở phòng chờ
+        if (this.State == RoomState.Waiting)
         {
-            Console.WriteLine($"Host {leavingPlayer.PlayerName} has left waiting room {this.RoomId}. Closing the room.");
-            
-            // Tạo thông báo phòng bị đóng
-            var notification = new RoomClosedNotification
+            // Trường hợp 1A: Người thoát là CHỦ PHÒNG -> Hủy phòng
+            if (leavingPlayer.IsHost)
             {
-                Type = "ROOM_CLOSED",
-                Payload = new RoomClosedPayload { Reason = "Host has left the room." }
-            };
+                Console.WriteLine($"Host {leavingPlayer.PlayerName} has left waiting room {this.RoomId}. Closing the room.");
 
-            // Gửi thông báo cho tất cả người chơi CÒN LẠI
-            await BroadcastMessageAsync(notification, excludePlayer: leavingPlayer);
+                // Tạo thông báo phòng bị đóng
+                var notification = new RoomClosedNotification
+                {
+                    Type = "ROOM_CLOSED",
+                    Payload = new RoomClosedPayload { Reason = "Host has left the room." }
+                };
 
-            // Xóa phòng này khỏi danh sách quản lý của server
-            LobbyManager.RemoveRoom(this.RoomId);
+                // Gửi thông báo cho tất cả người chơi CÒN LẠI
+                await BroadcastMessageAsync(notification, excludePlayer: leavingPlayer);
+
+                // Xóa phòng này khỏi danh sách quản lý của server
+                LobbyManager.RemoveRoom(this.RoomId);
+            }
+            // Trường hợp 1B: Người thoát là người chơi thường
+            else
+            {
+                // Chỉ cần xóa họ khỏi danh sách
+                Players.Remove(leavingPlayer);
+                Console.WriteLine($"Player {leavingPlayer.PlayerName} removed from waiting room {this.RoomId}.");
+
+                // Và thông báo cho những người còn lại
+                var notification = new PlayerLeftNotification
+                {
+                    Type = "PLAYER_LEFT",
+                    Payload = new PlayerLeftPayload
+                    {
+                        PlayerId = leavingPlayerId,
+                        PlayerName = leavingPlayer.PlayerName
+                    }
+                };
+                await BroadcastMessageAsync(notification, excludePlayer: leavingPlayer);
+            }
         }
-        // Trường hợp 1B: Người thoát là người chơi thường
-        else
+        // Kịch bản 2: Người chơi thoát khi trận đấu ĐANG DIỄN RA
+        else if (this.State == RoomState.Playing)
         {
-            // Chỉ cần xóa họ khỏi danh sách
-            Players.Remove(leavingPlayer);
-            Console.WriteLine($"Player {leavingPlayer.PlayerName} removed from waiting room {this.RoomId}.");
+            // Đánh dấu người chơi đã thoát nhưng không xóa khỏi danh sách
+            leavingPlayer.HasLeft = true;
+            leavingPlayer.ActiveConnection = null;
+            Console.WriteLine($"Player {leavingPlayer.PlayerName} has left ongoing match in room {this.RoomId}.");
 
-            // Và thông báo cho những người còn lại
+            // Thông báo cho những người chơi còn lại
             var notification = new PlayerLeftNotification
             {
                 Type = "PLAYER_LEFT",
@@ -325,73 +308,48 @@ public class GameRoom
                 }
             };
             await BroadcastMessageAsync(notification, excludePlayer: leavingPlayer);
-        }
-    }
-    // Kịch bản 2: Người chơi thoát khi trận đấu ĐANG DIỄN RA
-    else if (this.State == RoomState.Playing)
-    {
-        // Đánh dấu người chơi đã thoát nhưng không xóa khỏi danh sách
-        leavingPlayer.HasLeft = true;
-        leavingPlayer.ActiveConnection = null;
-        Console.WriteLine($"Player {leavingPlayer.PlayerName} has left ongoing match in room {this.RoomId}.");
 
-        // Thông báo cho những người chơi còn lại
-        var notification = new PlayerLeftNotification
-        {
-            Type = "PLAYER_LEFT",
-            Payload = new PlayerLeftPayload
+            // Kiểm tra xem có người thắng ngay lập tức không (chỉ còn 1 người)
+            var activePlayers = Players.Where(p => !p.HasLeft && !p.IsSurrendered).ToList();
+            if (activePlayers.Count == 1)
             {
-                PlayerId = leavingPlayerId,
-                PlayerName = leavingPlayer.PlayerName
+                var winner = activePlayers.First();
+                this.State = RoomState.Finished;
+                var gameOverNotif = new GameOverNotification
+                {
+                    Type = "GAME_OVER",
+                    Payload = new GameOverPayload { WinnerId = Players.IndexOf(winner), IsDraw = false }
+                };
+                await BroadcastMessageAsync(gameOverNotif);
+                Console.WriteLine($"Game over. Winner by default is {winner.PlayerName}.");
+                return; // Game đã kết thúc
             }
-        };
-        await BroadcastMessageAsync(notification, excludePlayer: leavingPlayer);
 
-        // Kiểm tra xem có người thắng ngay lập tức không (chỉ còn 1 người)
-        var activePlayers = Players.Where(p => !p.HasLeft && !p.IsSurrendered).ToList();
-        if (activePlayers.Count == 1)
-        {
-            var winner = activePlayers.First();
-            this.State = RoomState.Finished;
-            var gameOverNotif = new GameOverNotification
+            // Nếu game vẫn tiếp tục và là lượt của người vừa thoát, chuyển lượt đi
+            if (this.CurrentPlayerIndex == leavingPlayerId)
             {
-                Type = "GAME_OVER",
-                Payload = new GameOverPayload { WinnerId = Players.IndexOf(winner), IsDraw = false }
-            };
-            await BroadcastMessageAsync(gameOverNotif);
-            Console.WriteLine($"Game over. Winner by default is {winner.PlayerName}.");
-            return; // Game đã kết thúc
-        }
-
-        // Nếu game vẫn tiếp tục và là lượt của người vừa thoát, chuyển lượt đi
-        if (this.CurrentPlayerIndex == leavingPlayerId)
-        {
-            Console.WriteLine($"It was the leaving player's turn. Advancing turn...");
-            await AdvanceTurn();
+                Console.WriteLine($"It was the leaving player's turn. Advancing turn...");
+                await AdvanceTurn();
+            }
         }
     }
-}
     private async Task AdvanceTurn()
     {
-        // Kiểm tra xem còn ai có thể chơi không
         var activePlayers = Players.Where(p => !p.HasLeft && !p.IsSurrendered).ToList();
-        if (activePlayers.Count == 1) // Nếu còn đúng 1 người -> người đó thắng
+        
+        if (activePlayers.Count <= 1)
         {
-            var winner = activePlayers.First();
-            int winnerId = Players.IndexOf(winner);
-            var gameOverNotif = new GameOverNotification
+            if (activePlayers.Count == 1) // Nếu còn đúng 1 người -> người đó thắng
             {
-                Type = "GAME_OVER",
-                Payload = new GameOverPayload
-                {
-                    WinnerId = winnerId,
-                    IsDraw = false
-                }
-            };
-            await BroadcastMessageAsync(gameOverNotif);
-            Console.WriteLine($"Game over. Winner by default is {winner.PlayerName}.");
+                var winner = activePlayers.First();
+                var payload = new GameOverPayload { WinnerId = Players.IndexOf(winner), IsDraw = false };
+                await EndGameSequence(payload);
+            }
+            // Nếu không còn ai, phòng sẽ tự reset hoặc đóng
+            this.State = RoomState.Finished;
+            ResetRoomForNewGame();
+            return;
         }
-
         // Vòng lặp để tìm người chơi hợp lệ tiếp theo
         do
         {
@@ -433,43 +391,87 @@ public class GameRoom
         await BroadcastMessageAsync(notification);
 
         // 4. Kiểm tra xem có người chiến thắng ngay lập tức không (chỉ còn 1 người)
+ // Thay đổi ở phần kiểm tra người thắng cuối cùng
         var activePlayers = Players.Where(p => !p.HasLeft && !p.IsSurrendered).ToList();
         if (activePlayers.Count == 1)
         {
             var winner = activePlayers.First();
-            int winnerId = Players.IndexOf(winner);
-            this.State = RoomState.Finished;
-
-            var gameOverNotif = new GameOverNotification
-            {
-                Type = "GAME_OVER",
-                Payload = new GameOverPayload
-                {
-                    WinnerId = winnerId,
-                    IsDraw = false
-                }
-            };
-            await BroadcastMessageAsync(gameOverNotif);
-            Console.WriteLine($"Game over. Winner by default is {winner.PlayerName}.");
+            var payload = new GameOverPayload { WinnerId = Players.IndexOf(winner), IsDraw = false };
+            await EndGameSequence(payload);
             return;
         }
 
-        // 5. Nếu game chưa kết thúc và là lượt của người vừa đầu hàng, chuyển lượt
-        if (this.CurrentPlayerIndex == surrenderingPlayerId)
+        if (this.CurrentPlayerIndex == Players.IndexOf(surrenderingPlayer))
         {
             await AdvanceTurn();
         }
     }
     public void StartGameEarly(Player requestingPlayer)
-{
-    // Chỉ chủ phòng mới có quyền bắt đầu sớm
-    if (requestingPlayer != this.Host) return;
-    // Chỉ có thể bắt đầu khi đang ở phòng chờ
-    if (this.State != RoomState.Waiting) return;
-    // Phải có ít nhất 2 người
-    if (Players.Count < 2) return;
+    {
+        // Chỉ chủ phòng mới có quyền bắt đầu sớm
+        if (requestingPlayer != this.Host) return;
+        // Chỉ có thể bắt đầu khi đang ở phòng chờ
+        if (this.State != RoomState.Waiting) return;
+        // Phải có ít nhất 2 người
+        if (Players.Count < 2) return;
 
-    // Gọi phương thức StartGame hiện có
-    StartGame();
-}
+        // Gọi phương thức StartGame hiện có
+        StartGame();
+    }
+
+    // ================================================================
+    // PHƯƠNG THỨC HỖ TRỢ MỚI: RESET PHÒNG VỀ TRẠNG THÁI PHÒNG CHỜ
+    // ================================================================
+    private void ResetRoomForNewGame()
+    {
+        Console.WriteLine($"Resetting room {RoomId} for a new game.");
+
+        // 1. Xóa các người chơi đã thoát giữa chừng
+        Players.RemoveAll(p => p.HasLeft);
+
+        // 2. Reset trạng thái của những người chơi còn lại
+        foreach (var player in Players)
+        {
+            player.IsSurrendered = false;
+        }
+
+        // 3. Gán lại chủ phòng nếu chủ phòng cũ đã thoát
+        if (!Players.Contains(this.Host) && Players.Count > 0)
+        {
+            // Gỡ cờ host của người cũ (nếu có)
+            if (this.Host != null) this.Host.IsHost = false;
+
+            // Gán người đầu tiên trong danh sách làm host mới
+            this.Host = Players.First();
+            this.Host.IsHost = true;
+        }
+
+        // 4. Reset các thuộc tính của ván đấu
+        this.Board = new int[BOARD_SIZE, BOARD_SIZE];
+        this.MoveHistory.Clear();
+        this._moveCount = 0;
+        this.State = RoomState.Waiting;
+    }
+
+    // ================================================================
+    // PHƯƠNG THỨC HỖ TRỢ MỚI: LUỒNG XỬ LÝ KHI GAME KẾT THÚC
+    // ================================================================
+    private async Task EndGameSequence(GameOverPayload gameOverPayload)
+    {
+        // 1. Cập nhật trạng thái và gửi thông báo GAME_OVER
+        this.State = RoomState.Finished;
+        await BroadcastMessageAsync(new GameOverNotification { Type = "GAME_OVER", Payload = gameOverPayload });
+
+        string reason = gameOverPayload.IsDraw ? "Draw" : $"Winner is Player {gameOverPayload.WinnerId}";
+        Console.WriteLine($"Game over in room {RoomId}. Reason: {reason}.");
+
+        // 2. Chờ 5 giây để người chơi xem kết quả
+        await Task.Delay(5000);
+
+        // 3. Reset lại phòng về trạng thái phòng chờ
+        ResetRoomForNewGame();
+
+        // 4. Gửi thông báo yêu cầu client quay về màn hình phòng chờ
+        await BroadcastMessageAsync(new ReturnToLobbyNotification());
+    }
 }
