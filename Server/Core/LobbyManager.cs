@@ -63,4 +63,24 @@ public static class LobbyManager
             }
         }
     }
+    public static List<RoomInfo> GetAvailableRooms()
+    {
+        var availableRooms = new List<RoomInfo>();
+
+        // Duyệt qua tất cả các phòng đang có trên server
+        foreach (var room in _rooms.Values)
+        {
+            // Chỉ lấy những phòng đang ở trạng thái chờ và chưa đầy
+            if (room.State == RoomState.Waiting && room.Players.Count < 4 && room.Host != null)
+            {
+                availableRooms.Add(new RoomInfo
+                {
+                    RoomId = room.RoomId,
+                    HostName = room.Host.PlayerName,
+                    PlayerCount = room.Players.Count
+                });
+            }
+        }
+        return availableRooms;
+    }
 }
