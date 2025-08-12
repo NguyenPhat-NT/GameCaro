@@ -88,11 +88,27 @@ public class ClientHandler
         }
         finally
         {
-            IsConnected = false;
-            // Chỉ xử lý ngắt kết nối khi đang chơi và người chơi chưa chủ động thoát
-            if (this.PlayerData != null && !this.PlayerData.HasLeft && this.CurrentRoom != null && this.CurrentRoom.State == RoomState.Playing)
+            // Đánh dấu kết nối đã ngắt
+            if (PlayerData != null)
             {
-                await this.CurrentRoom.HandlePlayerDisconnection(this.PlayerData);
+                PlayerData.ActiveConnection = null;
+            }
+
+            // Xử lý logic ngắt kết nối cho cả 2 trường hợp: Đang chờ hoặc Đang chơi
+            if (this.PlayerData != null && !this.PlayerData.HasLeft && this.CurrentRoom != null)
+            {
+                Console.WriteLine($"Handling disconnection for player {PlayerData.PlayerName} in room {CurrentRoom.RoomId} (State: {CurrentRoom.State})...");
+
+                if (this.CurrentRoom.State == RoomState.Playing)
+                {
+                    // Nếu đang chơi, bắt đầu đếm giờ 30s
+                    await this.CurrentRoom.HandlePlayerDisconnection(this.PlayerData);
+                }
+                else if (this.CurrentRoom.State == RoomState.Waiting)
+                {
+                    // Nếu đang ở phòng chờ, xử lý như người chơi chủ động thoát
+                    await this.CurrentRoom.HandlePlayerLeaving(this.PlayerData);
+                }
             }
 
             Console.WriteLine($"Client disconnected: {PlayerData?.PlayerName ?? "Unknown"} at {_client.Client.RemoteEndPoint}");

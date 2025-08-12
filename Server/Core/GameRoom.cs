@@ -232,7 +232,6 @@ public class GameRoom
 
     public async Task HandlePlayerDisconnection(Player disconnectedPlayer)
     {
-        disconnectedPlayer.ActiveConnection = null;
         int disconnectedPlayerId = Players.IndexOf(disconnectedPlayer);
         Console.WriteLine($"Player {disconnectedPlayer.PlayerName} disconnected. Starting 30s timer...");
 
@@ -246,9 +245,33 @@ public class GameRoom
 
         await Task.Delay(30000);
 
-        if (!disconnectedPlayer.IsConnected)
+        // Sau 30 giây, kiểm tra lại
+        if (disconnectedPlayer.ActiveConnection == null && !disconnectedPlayer.HasLeft)
         {
-            Console.WriteLine($"Player {disconnectedPlayer.PlayerName} failed to reconnect. Forfeited.");
+            Console.WriteLine($"Player {disconnectedPlayer.PlayerName} failed to reconnect. Marking as left.");
+
+            // BƯỚC SỬA LỖI QUAN TRỌNG: Đánh dấu người chơi đã rời đi
+            disconnectedPlayer.HasLeft = true;
+
+            // KIỂM TRA LẠI ĐIỀU KIỆN THẮNG NGAY LẬP TỨC
+            var activePlayers = Players.Where(p => !p.HasLeft && !p.IsSurrendered).ToList();
+            if (activePlayers.Count == 1)
+            {
+                var winner = activePlayers.First();
+                int winnerId = Players.IndexOf(winner);
+                this.State = RoomState.Finished;
+
+                var gameOverNotif = new GameOverNotification
+                {
+                    Type = "GAME_OVER",
+                    Payload = new GameOverPayload { WinnerId = winnerId, IsDraw = false }
+                };
+                await BroadcastMessageAsync(gameOverNotif);
+                Console.WriteLine($"Game over. Winner by default is {winner.PlayerName}.");
+                return; // Game kết thúc
+            }
+
+            // Nếu game chưa kết thúc và là lượt của người chơi này, chuyển lượt
             if (this.CurrentPlayerIndex == disconnectedPlayerId)
             {
                 await AdvanceTurn();
