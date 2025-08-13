@@ -14,6 +14,12 @@ public class Player
     // THUỘC TÍNH MỚI: Đánh dấu ai là chủ phòng
     public bool IsHost { get; set; } = false;
 
+    // THUỘC TÍNH MỚI: ID cố định của người chơi trong phòng (0-3)
+    public int RoomPlayerId { get; set; }
+    // Thuộc tính mới: Cờ để biết người chơi đã xác nhận sẵn sàng hay chưa
+    public bool HasConfirmedReadiness { get; set; } = false;
+    
+
 
     public Player(string playerName, ClientHandler initialConnection)
     {
