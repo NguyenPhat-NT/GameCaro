@@ -1,8 +1,11 @@
-import 'dart:math'; // Thêm import cho Point
+// caro_ui/lib/widgets/game_board.dart
+
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../models/move_model.dart';
 import '../models/player_model.dart';
 import 'board_painter.dart';
+import '../game_theme.dart';
 
 class GameBoard extends StatefulWidget {
   final int width;
@@ -26,7 +29,6 @@ class GameBoard extends StatefulWidget {
 
 class _GameBoardState extends State<GameBoard> {
   late TransformationController _transformationController;
-  // THÊM MỚI: Biến state để lưu ô cờ đang được chọn tạm thời
   Point<int>? _pendingCell;
 
   @override
@@ -40,7 +42,7 @@ class _GameBoardState extends State<GameBoard> {
       if (box.hasSize) {
         final boardWidth = box.size.width;
         final boardHeight = box.size.height;
-        const double initialZoom = 1.8;
+        const double initialZoom = 2.2;
         final double translateX = (boardWidth - (boardWidth * initialZoom)) / 2;
         final double translateY =
             (boardHeight - (boardHeight * initialZoom)) / 2;
@@ -59,19 +61,23 @@ class _GameBoardState extends State<GameBoard> {
     super.dispose();
   }
 
-  // THÊM MỚI: Hàm xử lý logic nhấn 2 lần
-  void _handleTap(Offset boardPosition) {
-    final double cellWidth =
-        (context.findRenderObject() as RenderBox).size.width / widget.width;
-    final double cellHeight =
-        (context.findRenderObject() as RenderBox).size.height / widget.height;
+  void _handleTap(Offset boardPosition, Size boardRenderSize) {
+    final double cellHorizontalSize = boardRenderSize.width / widget.width;
+    final double cellVerticalSize = boardRenderSize.height / widget.height;
+    final double cellSize = min(cellHorizontalSize, cellVerticalSize);
 
-    final int x = (boardPosition.dx / cellWidth).floor();
-    final int y = (boardPosition.dy / cellHeight).floor();
+    final double gridRenderWidth = cellSize * widget.width;
+    final double gridRenderHeight = cellSize * widget.height;
+    final double offsetX = (boardRenderSize.width - gridRenderWidth) / 2;
+    final double offsetY = (boardRenderSize.height - gridRenderHeight) / 2;
 
-    // Bỏ qua nếu nhấn ra ngoài bàn cờ
+    final double relativeDx = boardPosition.dx - offsetX;
+    final double relativeDy = boardPosition.dy - offsetY;
+
+    final int x = (relativeDx / cellSize).floor();
+    final int y = (relativeDy / cellSize).floor();
+
     if (x < 0 || x >= widget.width || y < 0 || y >= widget.height) {
-      // Nếu đang có ô được chọn, hủy chọn nó
       if (_pendingCell != null) {
         setState(() {
           _pendingCell = null;
@@ -80,63 +86,58 @@ class _GameBoardState extends State<GameBoard> {
       return;
     }
 
-    // Kiểm tra nếu nhấn lần thứ hai vào đúng ô đã chọn
     if (_pendingCell != null && _pendingCell!.x == x && _pendingCell!.y == y) {
-      // Xác nhận nước đi
       widget.onMoveMade(x, y);
       setState(() {
-        _pendingCell = null; // Xóa ô đang chờ
+        _pendingCell = null;
       });
     } else {
-      // Lần nhấn đầu tiên hoặc nhấn vào một ô khác
       setState(() {
-        _pendingCell = Point(x, y); // Đặt ô này làm ô đang chờ
+        _pendingCell = Point(x, y);
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: widget.width / widget.height,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final boardRenderWidth = constraints.maxWidth;
-          final boardRenderHeight = constraints.maxHeight;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final boardRenderSize = Size(
+          constraints.maxWidth,
+          constraints.maxHeight,
+        );
 
-          return InteractiveViewer(
-            transformationController: _transformationController,
-            boundaryMargin: EdgeInsets.zero,
-            minScale: 0.5,
-            maxScale: 4.0,
-            child: GestureDetector(
-              onTapUp: (details) {
-                final RenderBox box = context.findRenderObject() as RenderBox;
-                final Offset localTapPosition = box.globalToLocal(
-                  details.globalPosition,
-                );
-                final Offset boardPosition = _transformationController.toScene(
-                  localTapPosition,
-                );
-                // Gọi hàm xử lý logic mới
-                _handleTap(boardPosition);
-              },
-              child: CustomPaint(
-                size: Size(boardRenderWidth, boardRenderHeight),
-                painter: BoardPainter(
-                  boardWidth: widget.width,
-                  boardHeight: widget.height,
-                  moves: widget.moves,
-                  players: widget.players,
-                  lastMove: widget.moves.isNotEmpty ? widget.moves.last : null,
-                  // THÊM MỚI: Truyền ô đang chờ vào painter
-                  pendingCell: _pendingCell,
-                ),
+        // Bỏ Container và ClipRect để loại bỏ viền ngoài
+        return InteractiveViewer(
+          transformationController: _transformationController,
+          panAxis: PanAxis.vertical,
+          minScale: 1.0,
+          maxScale: 4.0,
+          child: GestureDetector(
+            onTapUp: (details) {
+              final RenderBox box = context.findRenderObject() as RenderBox;
+              final Offset localTapPosition = box.globalToLocal(
+                details.globalPosition,
+              );
+              final Offset boardPosition = _transformationController.toScene(
+                localTapPosition,
+              );
+              _handleTap(boardPosition, boardRenderSize);
+            },
+            child: CustomPaint(
+              size: boardRenderSize,
+              painter: BoardPainter(
+                boardWidth: widget.width,
+                boardHeight: widget.height,
+                moves: widget.moves,
+                players: widget.players,
+                lastMove: widget.moves.isNotEmpty ? widget.moves.last : null,
+                pendingCell: _pendingCell,
               ),
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 }

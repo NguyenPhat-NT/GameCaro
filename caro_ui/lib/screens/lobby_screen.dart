@@ -9,6 +9,7 @@ import '../models/player_model.dart';
 import '../services/game_service.dart';
 import '../widgets/chat_drawer.dart';
 import 'game_screen.dart';
+import 'room_list_screen.dart';
 
 class LobbyScreen extends StatelessWidget {
   LobbyScreen({super.key});
@@ -126,6 +127,32 @@ class LobbyScreen extends StatelessWidget {
           style: textTheme.headlineSmall?.copyWith(color: AppColors.parchment),
         ),
         automaticallyImplyLeading: false,
+        actions: [
+          // Chỉ hiển thị nút này khi chưa ở trong phòng chờ nào
+          if (!isInLobby)
+            IconButton(
+              icon: const Icon(Icons.menu_open),
+              tooltip: 'Danh sách phòng',
+              onPressed: () {
+                // Lưu lại tên người chơi trước khi chuyển màn hình
+                final playerName = _nameController.text.trim();
+                if (playerName.isNotEmpty) {
+                  gameService.setMyPlayerName(playerName);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const RoomListScreen(),
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Vui lòng nhập tên người chơi trước.'),
+                    ),
+                  );
+                }
+              },
+            ),
+        ],
       ),
       endDrawer: const ChatDrawer(),
       body: isInLobby ? _buildLobbyView(context) : _buildInitialView(context),
@@ -309,10 +336,35 @@ class _LobbyActionButtons extends StatelessWidget {
       runSpacing: 12.0,
       direction: Axis.vertical,
       children: [
-        ElevatedButton.icon(
-          icon: const Icon(Icons.chat_bubble_outline),
-          label: const Text("Trò chuyện"),
-          onPressed: () => Scaffold.of(context).openEndDrawer(),
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            ElevatedButton.icon(
+              icon: const Icon(Icons.chat_bubble_outline),
+              label: const Text("Trò chuyện"),
+              onPressed: () {
+                // BƯỚC 3: Đánh dấu đã đọc tin nhắn
+                context.read<GameService>().markChatAsRead();
+                // Mở ngăn kéo chat
+                Scaffold.of(context).openEndDrawer();
+              },
+            ),
+            // BƯỚC 2: Hiển thị chấm đỏ nếu có tin nhắn chưa đọc
+            if (gameService.hasUnreadMessages)
+              Positioned(
+                top: -4,
+                right: -4,
+                child: Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.parchment, width: 2),
+                  ),
+                ),
+              ),
+          ],
         ),
         if (isHost && players.length >= 2)
           ElevatedButton.icon(
