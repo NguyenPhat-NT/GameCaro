@@ -89,7 +89,7 @@ class GameService with ChangeNotifier {
       case 'GAME_START':
         _isGameStarted = true;
         _moves.clear();
-        _chatMessages.clear();
+
         _winnerId = null;
 
         _isDraw = false;
@@ -239,10 +239,6 @@ class GameService with ChangeNotifier {
         }
         print("Game Over! WinnerId: $_winnerId, IsDraw: $_isDraw");
         break;
-      case 'LEAVE_ROOM_SUCCESS':
-      case 'ROOM_CLOSED':
-        _shouldNavigateHome = true;
-        break;
     }
     notifyListeners();
   }
@@ -285,6 +281,13 @@ class GameService with ChangeNotifier {
       _hasUnreadMessages = false;
       notifyListeners(); // Thông báo cho UI cập nhật (để xóa chấm đỏ)
     }
+  }
+
+  void findMatch(String playerName) {
+    // 1. Lưu lại tên người chơi
+    setMyPlayerName(playerName);
+    // 2. Gửi yêu cầu FIND_MATCH lên server
+    _networkService.send('FIND_MATCH', {'PlayerName': playerName});
   }
 
   void leaveRoom() {

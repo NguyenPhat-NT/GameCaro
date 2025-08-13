@@ -171,6 +171,7 @@ class _GameScreenState extends State<GameScreen> {
     }
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: AppColors.woodFrame,
       endDrawer: const ChatDrawer(),
       body: SafeArea(
@@ -236,82 +237,87 @@ class _GameScreenState extends State<GameScreen> {
     final currentPlayerId = gameService.currentPlayerId;
     final surrenderedIds = gameService.surrenderedPlayerIds;
 
-    Widget _buildPlayerName(Player player) {
-      return Text(
-        player.playerName,
-        style: Theme.of(
-          context,
-        ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-      );
+    // Hàm phụ để tạo widget cho một người chơi
+    Widget buildPlayerWidget(Player player, Alignment alignment) {
+      // Xác định vị trí dựa trên alignment
+      final position =
+          (alignment == Alignment.topLeft)
+              ? Positioned(
+                top: 10,
+                left: 10,
+                child: _playerCard(player, currentPlayerId, surrenderedIds),
+              )
+              : (alignment == Alignment.topRight)
+              ? Positioned(
+                top: 10,
+                right: 10,
+                child: _playerCard(player, currentPlayerId, surrenderedIds),
+              )
+              : (alignment == Alignment.bottomLeft)
+              ? Positioned(
+                bottom: 55,
+                left: 10,
+                child: _playerCard(
+                  player,
+                  currentPlayerId,
+                  surrenderedIds,
+                  nameFirst: true,
+                ),
+              )
+              : Positioned(
+                bottom: 55,
+                right: 10,
+                child: _playerCard(
+                  player,
+                  currentPlayerId,
+                  surrenderedIds,
+                  nameFirst: true,
+                ),
+              );
+      return position;
     }
+
+    // Xác định các vị trí cho tối đa 4 người chơi
+    final alignments = [
+      Alignment.topLeft,
+      Alignment.topRight,
+      Alignment.bottomLeft,
+      Alignment.bottomRight,
+    ];
 
     return Stack(
       children: [
-        if (players.isNotEmpty)
-          Positioned(
-            top: 10,
-            left: 10,
-            child: Column(
-              children: [
-                PlayerInfoCard(
-                  player: players[0],
-                  isMyTurn: currentPlayerId == 0,
-                  hasSurrendered: surrenderedIds.contains(0),
-                ),
-                const SizedBox(height: 4),
-                _buildPlayerName(players[0]),
-              ],
-            ),
-          ),
-        if (players.length > 1)
-          Positioned(
-            top: 10,
-            right: 10,
-            child: Column(
-              children: [
-                PlayerInfoCard(
-                  player: players[1],
-                  isMyTurn: currentPlayerId == 1,
-                  hasSurrendered: surrenderedIds.contains(1),
-                ),
-                const SizedBox(height: 4),
-                _buildPlayerName(players[1]),
-              ],
-            ),
-          ),
-        if (players.length > 2)
-          Positioned(
-            bottom: 55,
-            left: 10,
-            child: Column(
-              children: [
-                _buildPlayerName(players[2]),
-                const SizedBox(height: 4),
-                PlayerInfoCard(
-                  player: players[2],
-                  isMyTurn: currentPlayerId == 2,
-                  hasSurrendered: surrenderedIds.contains(2),
-                ),
-              ],
-            ),
-          ),
-        if (players.length > 3)
-          Positioned(
-            bottom: 55,
-            right: 10,
-            child: Column(
-              children: [
-                _buildPlayerName(players[3]),
-                const SizedBox(height: 4),
-                PlayerInfoCard(
-                  player: players[3],
-                  isMyTurn: currentPlayerId == 3,
-                  hasSurrendered: surrenderedIds.contains(3),
-                ),
-              ],
-            ),
-          ),
+        // Dùng vòng lặp để tạo widget cho mỗi người chơi có trong phòng
+        for (int i = 0; i < players.length; i++)
+          buildPlayerWidget(players[i], alignments[i]),
       ],
+    );
+  }
+
+  Widget _playerCard(
+    Player player,
+    int? currentPlayerId,
+    Set<int> surrenderedIds, {
+    bool nameFirst = false,
+  }) {
+    final card = PlayerInfoCard(
+      player: player,
+      // SỬA LỖI: So sánh với playerId thực tế của người chơi
+      isMyTurn: currentPlayerId == player.playerId,
+      hasSurrendered: surrenderedIds.contains(player.playerId),
+    );
+    final name = Text(
+      player.playerName,
+      style: Theme.of(
+        context,
+      ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+    );
+
+    return Column(
+      children:
+          nameFirst
+              ? [name, const SizedBox(height: 4), card]
+              : [card, const SizedBox(height: 4), name],
     );
   }
 
