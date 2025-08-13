@@ -141,6 +141,19 @@ class _GameScreenState extends State<GameScreen> {
     final gameService = context.watch<GameService>();
     final myPlayerId = gameService.myPlayerId;
 
+    if (gameService.shouldReturnToLobby) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Reset cờ hiệu để không bị lặp vô hạn
+        context.read<GameService>().consumeReturnToLobbySignal();
+
+        // Thay thế màn hình hiện tại bằng LobbyScreen
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => LobbyScreen()),
+          );
+        }
+      });
+    }
     if (_lastKnownCurrentPlayerId != gameService.currentPlayerId) {
       _lastKnownCurrentPlayerId = gameService.currentPlayerId;
       _showTurnMessage(gameService);
@@ -334,32 +347,31 @@ class _GameScreenState extends State<GameScreen> {
               ),
             ),
             const SizedBox(height: 24),
+            // Nút Chơi lại
             ElevatedButton(
               onPressed: () {
-                print("UI: Người dùng bấm nút Game Mới");
-                // context.read<GameService>().requestNewGame();
+                // Nút này không làm gì cả, chỉ chờ server gửi lệnh
+                _showOverlayMessage(
+                  "Đang chờ những người chơi khác...",
+                  duration: const Duration(seconds: 5),
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.parchment,
               ),
               child: Text(
-                "Game Mới",
+                "Chơi lại", // Đổi tên nút
                 style: Theme.of(
                   context,
                 ).textTheme.labelLarge?.copyWith(color: AppColors.ink),
               ),
             ),
             const SizedBox(height: 12),
+            // Nút Thoát phòng
             TextButton(
               onPressed: () {
-                print("UI: Người dùng bấm nút Thoát Phòng");
-                context.read<GameService>().resetStateForNewConnection();
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(
-                    builder: (context) => LobbyScreen(), // Sửa lỗi: Bỏ const
-                  ),
-                  (Route<dynamic> route) => false,
-                );
+                // Chỉ cần gọi leaveRoom, GameService sẽ xử lý việc điều hướng
+                context.read<GameService>().leaveRoom();
               },
               child: Text(
                 "Thoát Phòng",
@@ -404,12 +416,33 @@ class _GameControlButtons extends StatelessWidget {
               color: AppColors.ink.withOpacity(0.4),
             ),
             const SizedBox(width: 4),
-            IconButton(
-              tooltip: "Trò chuyện",
-              icon: const Icon(Icons.chat_bubble_outline),
-              onPressed: () {
-                Scaffold.of(context).openEndDrawer();
-              },
+            Stack(
+              alignment: Alignment.topRight,
+              children: [
+                IconButton(
+                  tooltip: "Trò chuyện",
+                  icon: const Icon(Icons.chat_bubble_outline),
+                  onPressed: () {
+                    // BƯỚC 3: Đánh dấu đã đọc tin nhắn
+                    context.read<GameService>().markChatAsRead();
+                    // Mở ngăn kéo chat
+                    Scaffold.of(context).openEndDrawer();
+                  },
+                ),
+                // BƯỚC 2: Hiển thị chấm đỏ nếu có tin nhắn chưa đọc
+                if (gameService.hasUnreadMessages)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0, right: 8.0),
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             IconButton(
               tooltip: "Đầu hàng",

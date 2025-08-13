@@ -11,7 +11,6 @@ class BoardPainter extends CustomPainter {
   final List<Move> moves;
   final List<Player> players;
   final Move? lastMove;
-  // THÊM MỚI: Thuộc tính để nhận ô đang chờ
   final Point<int>? pendingCell;
 
   BoardPainter({
@@ -20,29 +19,44 @@ class BoardPainter extends CustomPainter {
     required this.moves,
     required this.players,
     this.lastMove,
-    this.pendingCell, // Thêm vào constructor
+    this.pendingCell,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final double cellWidth = size.width / boardWidth;
-    final double cellHeight = size.height / boardHeight;
+    final double cellHorizontalSize = size.width / boardWidth;
+    final double cellVerticalSize = size.height / boardHeight;
+    final double cellSize = min(cellHorizontalSize, cellVerticalSize);
+
+    final double gridRenderWidth = cellSize * boardWidth;
+    final double gridRenderHeight = cellSize * boardHeight;
+    final double offsetX = (size.width - gridRenderWidth) / 2;
+    final double offsetY = (size.height - gridRenderHeight) / 2;
+
     final gridPaint =
         Paint()
           ..color = AppColors.gridLines
           ..strokeWidth = 1.0;
 
-    // Vẽ lưới
+    // Vẽ lưới cờ
     for (int i = 0; i <= boardWidth; i++) {
-      final double xPos = i * cellWidth;
-      canvas.drawLine(Offset(xPos, 0), Offset(xPos, size.height), gridPaint);
+      final double xPos = offsetX + i * cellSize;
+      canvas.drawLine(
+        Offset(xPos, offsetY),
+        Offset(xPos, offsetY + gridRenderHeight),
+        gridPaint,
+      );
     }
     for (int i = 0; i <= boardHeight; i++) {
-      final double yPos = i * cellHeight;
-      canvas.drawLine(Offset(0, yPos), Offset(size.width, yPos), gridPaint);
+      final double yPos = offsetY + i * cellSize;
+      canvas.drawLine(
+        Offset(offsetX, yPos),
+        Offset(offsetX + gridRenderWidth, yPos),
+        gridPaint,
+      );
     }
 
-    // Vẽ các nước đi đã thực hiện
+    // Vẽ các nước đi
     for (final move in moves) {
       Player player;
       try {
@@ -61,9 +75,9 @@ class BoardPainter extends CustomPainter {
             ..style = PaintingStyle.stroke
             ..strokeWidth = 2.0;
 
-      final double centerX = (move.x + 0.5) * cellWidth;
-      final double centerY = (move.y + 0.5) * cellHeight;
-      final double radius = min(cellWidth, cellHeight) * 0.4;
+      final double centerX = offsetX + (move.x + 0.5) * cellSize;
+      final double centerY = offsetY + (move.y + 0.5) * cellSize;
+      final double radius = cellSize * 0.4;
 
       if (lastMove != null && move.x == lastMove!.x && move.y == lastMove!.y) {
         final glowPaint =
@@ -85,31 +99,25 @@ class BoardPainter extends CustomPainter {
       );
     }
 
-    // THÊM MỚI: Vẽ dấu hiệu cho ô đang chờ
     if (pendingCell != null) {
-      final double centerX = (pendingCell!.x + 0.5) * cellWidth;
-      final double centerY = (pendingCell!.y + 0.5) * cellHeight;
-
+      final Rect cellRect = Rect.fromLTWH(
+        offsetX + pendingCell!.x * cellSize,
+        offsetY + pendingCell!.y * cellSize,
+        cellSize,
+        cellSize,
+      );
       final pendingPaint =
           Paint()
-            ..color = Colors.black.withOpacity(0.25) // Một lớp phủ mờ màu tối
+            ..color = Colors.black.withOpacity(0.25)
             ..style = PaintingStyle.fill;
-
-      final Rect cellRect = Rect.fromLTWH(
-        pendingCell!.x * cellWidth,
-        pendingCell!.y * cellHeight,
-        cellWidth,
-        cellHeight,
-      );
       canvas.drawRect(cellRect, pendingPaint);
     }
   }
 
   @override
   bool shouldRepaint(covariant BoardPainter oldDelegate) {
-    // Thêm pendingCell vào điều kiện vẽ lại
     return oldDelegate.moves.length != moves.length ||
         oldDelegate.lastMove != lastMove ||
-        oldDelegate.pendingCell != pendingCell;
+        oldDelegate.pendingCell != oldDelegate.pendingCell;
   }
 }
