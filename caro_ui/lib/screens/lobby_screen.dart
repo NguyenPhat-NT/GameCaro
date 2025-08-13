@@ -182,15 +182,38 @@ class LobbyScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            // SỬA LỖI: Bọc các nút trong Wrap để xuống dòng khi không đủ chỗ
+            Wrap(
+              spacing: 16,
+              runSpacing: 12,
+              alignment: WrapAlignment.center,
               children: [
                 ElevatedButton(
                   onPressed:
                       () => gameService.createRoom(_nameController.text.trim()),
                   child: const Text('Tạo Phòng Mới'),
                 ),
-                const SizedBox(width: 16),
+                // THÊM MỚI: Nút Tìm trận
+                ElevatedButton(
+                  onPressed: () {
+                    final playerName = _nameController.text.trim();
+                    if (playerName.isNotEmpty) {
+                      gameService.findMatch(playerName);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Vui lòng nhập tên trước khi tìm trận.',
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.highlight, // Màu xanh lá
+                  ),
+                  child: const Text('Tìm trận'),
+                ),
                 OutlinedButton(
                   onPressed: () => _showJoinRoomDialog(context),
                   child: const Text('Tham gia phòng'),
