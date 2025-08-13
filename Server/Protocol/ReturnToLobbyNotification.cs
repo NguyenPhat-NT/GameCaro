@@ -1,8 +1,11 @@
 // Server/Protocol/ReturnToLobbyNotification.cs
+using System.Text.Json.Serialization;
 
-// Tin nhắn này không cần payload, client chỉ cần nhận được Type là đủ hiểu.
 public class ReturnToLobbyNotification : BaseMessage
 {
+    [JsonPropertyName("Payload")]
+    public ReturnToLobbyPayload Payload { get; set; }
+
     public ReturnToLobbyNotification()
     {
         Type = "RETURN_TO_LOBBY";

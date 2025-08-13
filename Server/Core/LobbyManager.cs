@@ -83,4 +83,39 @@ public static class LobbyManager
         }
         return availableRooms;
     }
+    public static void StartAfkCheckService()
+    {
+        // Task.Run để chạy tiến trình này trên một luồng riêng biệt, không làm ảnh hưởng đến server chính
+        Task.Run(async () =>
+        {
+            // Vòng lặp vô tận để dịch vụ chạy mãi mãi
+            while (true)
+            {
+                // Đặt thời gian quét, ví dụ mỗi phút một lần
+                await Task.Delay(TimeSpan.FromMinutes(1));
+                
+
+                Console.WriteLine("[AFK Check] Scanning for inactive rooms...");
+
+                // Lấy ra danh sách các phòng thỏa mãn điều kiện:
+                // 1. Đang ở trạng thái chờ (Waiting)
+                // 2. Không đang trong quá trình kiểm tra
+                // 3. Đã không có hoạt động gì trong hơn 10 phút
+                var inactiveRooms = _rooms.Values
+                    .Where(r => r.State == RoomState.Waiting &&
+                                !r.IsInReadinessCheck &&
+                                (DateTime.UtcNow - r.LastActivityTime).TotalMinutes > 10)
+                    .ToList();
+
+                foreach (var room in inactiveRooms)
+                {
+                    Console.WriteLine($"[AFK Check] Room {room.RoomId} is inactive. Initiating readiness check.");
+
+                    // Bắt đầu quá trình kiểm tra cho từng phòng không hoạt động
+                    // Dùng _ = để chạy tác vụ mà không cần đợi nó hoàn thành
+                    _ = room.InitiateReadinessCheck();
+                }
+            }
+        });
+    }
 }

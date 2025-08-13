@@ -20,68 +20,30 @@ public class ClientHandler
         _stream = _client.GetStream();
     }
 
-    public async Task HandleClientAsync()
+public async Task HandleClientAsync()
+{
+    Console.WriteLine($"Client connected: {_client.Client.RemoteEndPoint}");
+    var buffer = new byte[4096];
+    var messageBuffer = new StringBuilder(); // Dùng StringBuilder để xây dựng chuỗi JSON hoàn chỉnh
+
+    try
     {
-        Console.WriteLine($"Client connected: {_client.Client.RemoteEndPoint}");
-        try
+        while (true)
         {
-            byte[] buffer = new byte[4096];
-            int bytesRead;
-
-            while ((bytesRead = await _stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            int bytesRead = await _stream.ReadAsync(buffer, 0, buffer.Length);
+            if (bytesRead == 0)
             {
-                string jsonString = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                Console.WriteLine($"Received from {PlayerData?.PlayerName ?? "New Client"}: {jsonString}");
-
-                var baseMessage = JsonSerializer.Deserialize<BaseMessage>(jsonString);
-
-                switch (baseMessage?.Type)
-                {
-                    case "CREATE_ROOM":
-                        HandleCreateRoom(jsonString);
-                        break;
-
-                    case "JOIN_ROOM":
-                        await HandleJoinRoom(jsonString);
-                        break;
-                    case "LEAVE_ROOM":
-                        await HandleLeaveRoom();
-                        break;
-                    case "START_GAME_EARLY":
-                        HandleStartGameEarly();
-                        break;
-                    case "GET_ROOM_LIST":
-                        await HandleGetRoomList();
-                        break;
-
-                    case "MAKE_MOVE":
-                        HandleMakeMove(jsonString);
-                        break;
-                    case "SURRENDER":
-                        await HandleSurrender();
-                        break;
-                    case "FIND_MATCH":
-                        await HandleFindMatch(jsonString);
-                        break;
-
-                    // ================================================================
-                    // THÊM CASE MỚI ĐỂ XỬ LÝ TIN NHẮN CHAT
-                    // ================================================================
-                    case "SEND_CHAT_MESSAGE":
-                        HandleSendChatMessage(jsonString);
-                        break;
-                    // ================================================================
-
-                    case "RECONNECT":
-                        await HandleReconnect(jsonString);
-                        break;
-
-                    default:
-                        Console.WriteLine($"Unknown message type: {baseMessage?.Type}");
-                        break;
-                }
+                // Client đã đóng kết nối
+                break;
             }
+
+            // Nối dữ liệu mới đọc được vào bộ đệm
+            messageBuffer.Append(Encoding.UTF8.GetString(buffer, 0, bytesRead));
+
+            // Xử lý tất cả các tin nhắn JSON hoàn chỉnh có trong bộ đệm
+            ProcessBuffer(messageBuffer);
         }
+    }
         catch (Exception ex)
         {
             Console.WriteLine($"Error handling client {PlayerData?.PlayerName}: {ex.Message}");
@@ -115,6 +77,96 @@ public class ClientHandler
             _client.Close();
         }
     }
+    private void ProcessBuffer(StringBuilder messageBuffer)
+{
+    while (true)
+    {
+        string currentBuffer = messageBuffer.ToString();
+        if (string.IsNullOrWhiteSpace(currentBuffer))
+            break;
+
+        // Tìm vị trí kết thúc của một JSON object hoàn chỉnh đầu tiên
+        int jsonEndIndex = FindJsonEnd(currentBuffer);
+
+        if (jsonEndIndex != -1)
+        {
+            // Trích xuất tin nhắn JSON hoàn chỉnh
+            string jsonMessage = currentBuffer.Substring(0, jsonEndIndex);
+            
+            // Xóa tin nhắn vừa xử lý khỏi bộ đệm
+            messageBuffer.Remove(0, jsonEndIndex);
+
+            // Xử lý tin nhắn JSON
+            try
+            {
+                Console.WriteLine($"Processing JSON: {jsonMessage}");
+                var baseMessage = JsonSerializer.Deserialize<BaseMessage>(jsonMessage);
+                
+                // Dùng Task.Run để không block vòng lặp xử lý buffer
+                _ = Task.Run(() => DispatchMessage(baseMessage, jsonMessage));
+            }
+            catch (JsonException ex)
+            {
+                Console.WriteLine($"JSON Deserialization Error: {ex.Message}. Corrupted data: {jsonMessage}");
+            }
+        }
+        else
+        {
+            // Không tìm thấy JSON hoàn chỉnh, đợi thêm dữ liệu
+            break;
+        }
+    }
+}
+
+// Phương thức điều phối tin nhắn (tách ra từ switch-case cũ)
+private async Task DispatchMessage(BaseMessage? baseMessage, string jsonString)
+{
+    switch (baseMessage?.Type)
+    {
+        case "CREATE_ROOM": HandleCreateRoom(jsonString); break;
+        case "JOIN_ROOM": await HandleJoinRoom(jsonString); break;
+        case "LEAVE_ROOM": await HandleLeaveRoom(); break;
+        case "SURRENDER": await HandleSurrender(); break;
+        case "START_GAME_EARLY": HandleStartGameEarly(); break;
+        case "FIND_MATCH": await HandleFindMatch(jsonString); break;
+        case "GET_ROOM_LIST": await HandleGetRoomList(); break;
+        case "CONFIRM_READINESS": HandleConfirmReadiness(); break;
+        case "MAKE_MOVE": await HandleMakeMove(jsonString); break;
+        case "SEND_CHAT_MESSAGE": HandleSendChatMessage(jsonString); break;
+        case "RECONNECT": await HandleReconnect(jsonString); break;
+        default: Console.WriteLine($"Unknown message type: {baseMessage?.Type}"); break;
+    }
+}
+
+
+// Phương thức hỗ trợ tìm điểm kết thúc của JSON
+private int FindJsonEnd(string buffer)
+{
+    int braceCount = 0;
+    bool inString = false;
+    for (int i = 0; i < buffer.Length; i++)
+    {
+        char c = buffer[i];
+        if (c == '"' && (i == 0 || buffer[i - 1] != '\\'))
+        {
+            inString = !inString;
+        }
+
+        if (!inString)
+        {
+            if (c == '{') braceCount++;
+            else if (c == '}') braceCount--;
+        }
+
+        if (braceCount == 0 && i > 0)
+        {
+            // Tìm thấy một JSON object hoàn chỉnh
+            return i + 1;
+        }
+    }
+    return -1; // Không tìm thấy
+}
+
 
     public async Task SendMessageAsync(BaseMessage message)
     {
@@ -250,45 +302,64 @@ public class ClientHandler
         await this.CurrentRoom.ProcessPlayerMoveAsync(this.PlayerData, payload.X, payload.Y);
     }
 
-    private async Task HandleReconnect(string? jsonString)
+    private async Task HandleReconnect(string jsonString)
     {
-        if (string.IsNullOrEmpty(jsonString)) return;
-        var request = JsonSerializer.Deserialize<ClientMessage<ReconnectRequest>>(jsonString)?.Payload;
+        // Cũ: var request = JsonSerializer.Deserialize<ClientMessage<ReconnectRequest>>(jsonString)?.Payload;
+        var request = JsonSerializer.Deserialize<ClientMessage<ReconnectRequest>>(jsonString)?.Payload; // Đã sửa
         if (request?.RoomId == null || request.SessionToken == null) return;
 
         var room = LobbyManager.GetRoom(request.RoomId);
-        if (room == null) return;
+        Player? playerToReconnect = room?.Players.FirstOrDefault(p => p.SessionToken == request.SessionToken);
 
-        var playerToReconnect = room.Players.FirstOrDefault(p => p.SessionToken == request.SessionToken);
-        if (playerToReconnect != null && !playerToReconnect.IsConnected)
+        // Xử lý trường hợp thất bại (phòng không tồn tại, token sai, hoặc người chơi đang online)
+        if (room == null || playerToReconnect == null || playerToReconnect.IsConnected)
         {
-            playerToReconnect.ActiveConnection = this;
-            this.PlayerData = playerToReconnect;
-            this.CurrentRoom = room;
-
-            // ================================================================
-            // CẬP NHẬT TẠI ĐÂY
-            // ================================================================
-            var gameStateUpdate = new GameStateUpdateMessage
+            var failureResponse = new ReconnectResultResponse
             {
-                Type = "GAME_STATE_UPDATE",
-                Players = room.Players.Select((p, index) => new PlayerInfo { PlayerName = p.PlayerName, PlayerId = index, SessionToken = p.SessionToken }).ToList(),
-                Moves = room.MoveHistory,
-                CurrentPlayerId = room.CurrentPlayerIndex,
-                // Gửi kèm lịch sử chat đã được lưu
-                ChatHistory = room.ChatHistory
+                Type = "RECONNECT_RESULT",
+                Payload = new ReconnectResultPayload { Success = false, GameState = null }
             };
-            // ================================================================
-
-            await SendMessageAsync(gameStateUpdate);
-
-            var notification = new PlayerReconnectedNotification
-            {
-                Type = "PLAYER_RECONNECTED",
-                PlayerId = room.Players.IndexOf(playerToReconnect)
-            };
-            await room.BroadcastMessageAsync(notification, excludePlayer: playerToReconnect);
+            await SendMessageAsync(failureResponse);
+            Console.WriteLine($"Reconnect failed for token {request.SessionToken} in room {request.RoomId}.");
+            return;
         }
+
+        // Xử lý trường hợp thành công
+        // 1. Gán lại kết nối mới
+        playerToReconnect.ActiveConnection = this;
+        this.PlayerData = playerToReconnect;
+        this.CurrentRoom = room;
+        Console.WriteLine($"Player {playerToReconnect.PlayerName} reconnected successfully.");
+
+        // 2. Gửi RECONNECT_RESULT với toàn bộ trạng thái game
+        var gameState = new GameStatePayload
+        {
+            Players = room.Players.Select((p, index) => new PlayerInfo
+            {
+                PlayerName = p.PlayerName,
+                PlayerId = p.RoomPlayerId, // <-- Bắt đầu sử dụng RoomPlayerId ở đây
+                SessionToken = p.SessionToken,
+                IsHost = p.IsHost
+            }).ToList(),
+            Moves = room.MoveHistory,
+            CurrentPlayerId = room.Players[room.CurrentPlayerIndex].RoomPlayerId, // <-- Gửi ID cố định
+            ChatHistory = room.ChatHistory
+        };
+
+        var successResponse = new ReconnectResultResponse
+        {
+            Type = "RECONNECT_RESULT",
+            Payload = new ReconnectResultPayload { Success = true, GameState = gameState }
+        };
+        await SendMessageAsync(successResponse);
+
+        // 3. Gửi thông báo PLAYER_RECONNECTED cho những người khác
+        var notification = new PlayerReconnectedNotification
+        {
+            Type = "PLAYER_RECONNECTED",
+            PlayerId = playerToReconnect.RoomPlayerId // <-- Gửi ID cố định
+        };
+        await room.BroadcastMessageAsync(notification, excludePlayer: playerToReconnect);
     }
     private async Task HandleLeaveRoom()
     {
@@ -404,4 +475,12 @@ public class ClientHandler
         // 3. Gửi danh sách về cho client đã yêu cầu
         await SendMessageAsync(response);
     }
+    private void HandleConfirmReadiness()
+{
+    if (this.PlayerData != null)
+    {
+        this.PlayerData.HasConfirmedReadiness = true;
+        Console.WriteLine($"[AFK Check] Player {this.PlayerData.PlayerName} confirmed readiness.");
+    }
+}
 }

@@ -1,31 +1,25 @@
 {
   "format": 1,
   "restore": {
-    "C:\\A\\test\\CARO1\\GameCaro\\Server\\Server.csproj": {}
+    "D:\\Tai lieu\\LTM\\uploadServer\\GameCaro\\Server\\Server.csproj": {}
   },
   "projects": {
-    "C:\\A\\test\\CARO1\\GameCaro\\Server\\Server.csproj": {
+    "D:\\Tai lieu\\LTM\\uploadServer\\GameCaro\\Server\\Server.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\A\\test\\CARO1\\GameCaro\\Server\\Server.csproj",
+        "projectUniqueName": "D:\\Tai lieu\\LTM\\uploadServer\\GameCaro\\Server\\Server.csproj",
         "projectName": "Server",
-        "projectPath": "C:\\A\\test\\CARO1\\GameCaro\\Server\\Server.csproj",
-        "packagesPath": "C:\\Users\\ADMIN\\.nuget\\packages\\",
-        "outputPath": "C:\\A\\test\\CARO1\\GameCaro\\Server\\obj\\",
+        "projectPath": "D:\\Tai lieu\\LTM\\uploadServer\\GameCaro\\Server\\Server.csproj",
+        "packagesPath": "C:\\Users\\PhatNT\\.nuget\\packages\\",
+        "outputPath": "D:\\Tai lieu\\LTM\\uploadServer\\GameCaro\\Server\\obj\\",
         "projectStyle": "PackageReference",
-        "fallbackFolders": [
-          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
-        ],
         "configFilePaths": [
-          "C:\\Users\\ADMIN\\AppData\\Roaming\\NuGet\\NuGet.Config",
-          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
-          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+          "C:\\Users\\PhatNT\\AppData\\Roaming\\NuGet\\NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net9.0"
         ],
         "sources": {
-          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
@@ -65,7 +59,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.302/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.303/PortableRuntimeIdentifierGraph.json"
         }
       }
     }
