@@ -267,7 +267,13 @@ private int FindJsonEnd(string buffer)
         await room.BroadcastMessageAsync(notification);
 
         // Lấy danh sách người chơi hiện tại để gửi cho người mới
-        var existingPlayers = room.Players.Select((p, index) => new PlayerInfo { PlayerName = p.PlayerName, PlayerId = index, SessionToken = p.SessionToken, IsHost = p.IsHost }).ToList();
+        var existingPlayers = room.Players.Select((p, index) => new PlayerInfo
+        {
+            PlayerName = p.PlayerName,
+            PlayerId = p.RoomPlayerId, 
+            SessionToken = p.SessionToken, 
+            IsHost = p.IsHost
+        }).ToList();
 
         // Thêm người chơi mới vào phòng
         room.AddPlayer(newPlayer);
@@ -430,8 +436,8 @@ private int FindJsonEnd(string buffer)
         var existingPlayers = room.Players.Select((p, index) => new PlayerInfo
         {
             PlayerName = p.PlayerName,
-            PlayerId = index,
-            SessionToken = p.SessionToken,
+            PlayerId = p.RoomPlayerId, 
+            SessionToken = p.SessionToken, 
             IsHost = p.IsHost
         }).ToList();
 
