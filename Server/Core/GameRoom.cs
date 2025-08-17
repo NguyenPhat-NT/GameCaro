@@ -157,7 +157,7 @@ public class GameRoom
 
         this.Board[x, y] = this.CurrentPlayerIndex + 1;
         _moveCount++;
-        MoveHistory.Add(new MoveInfo { X = x, Y = y, PlayerId = this.CurrentPlayerIndex });
+        MoveHistory.Add(new MoveInfo { X = x, Y = y, PlayerId = player.RoomPlayerId });
 
         var boardUpdateNotif = new BoardUpdateNotification
         {
