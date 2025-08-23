@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // <-- Thư viện cần thiết
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-
+import 'package:caro_ui/widgets/connection_status_overlay.dart';
 import 'services/game_service.dart';
 import 'services/connection_screen.dart';
 import 'game_theme.dart';
@@ -40,7 +40,7 @@ class MyApp extends StatelessWidget {
           Theme.of(context).textTheme,
         ).apply(bodyColor: AppColors.ink, displayColor: AppColors.ink),
       ),
-      home: const ConnectionScreen(),
+      home: const ConnectionStatusOverlay(child: ConnectionScreen()),
       debugShowCheckedModeBanner: false,
     );
   }

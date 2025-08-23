@@ -23,8 +23,8 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
   @override
   void initState() {
     super.initState();
-    _ipController.text = '103.157.205.146';
-    _portController.text = '8888';
+    _ipController.text = 'phatnt.ddns.net';
+    _portController.text = '47382';
   }
 
   void _connectToServer() async {
@@ -40,7 +40,9 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
 
     if (port == null) {
       _showErrorDialog("Lỗi", "Cổng (Port) phải là một con số.");
-      setState(() { _isLoading = false; });
+      setState(() {
+        _isLoading = false;
+      });
       return;
     }
 
@@ -50,9 +52,9 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
     if (!mounted) return;
 
     if (success) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => LobbyScreen()),
-      );
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (context) => LobbyScreen()));
     } else {
       _showErrorDialog(
         "Kết nối thất bại",
@@ -70,17 +72,21 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
   void _showErrorDialog(String title, String content) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.parchment,
-        title: Text(title),
-        content: Text(content),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text("Đã hiểu", style: TextStyle(color: AppColors.ink)),
+      builder:
+          (context) => AlertDialog(
+            backgroundColor: AppColors.parchment,
+            title: Text(title),
+            content: Text(content),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text(
+                  "Đã hiểu",
+                  style: TextStyle(color: AppColors.ink),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
@@ -105,13 +111,19 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
             decoration: BoxDecoration(
               color: AppColors.parchment,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.ink.withOpacity(0.5), width: 2),
+              border: Border.all(
+                color: AppColors.ink.withOpacity(0.5),
+                width: 2,
+              ),
             ),
             constraints: const BoxConstraints(maxWidth: 400),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text("CARO ONLINE", style: textTheme.headlineSmall?.copyWith(fontSize: 28)),
+                Text(
+                  "CARO ONLINE",
+                  style: textTheme.headlineSmall?.copyWith(fontSize: 28),
+                ),
                 const SizedBox(height: 24),
                 TextField(
                   controller: _ipController,
@@ -134,15 +146,21 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                 _isLoading
                     ? const CircularProgressIndicator(color: AppColors.ink)
                     : ElevatedButton(
-                        onPressed: _connectToServer,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.ink,
-                          foregroundColor: AppColors.parchment,
-                          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      onPressed: _connectToServer,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.ink,
+                        foregroundColor: AppColors.parchment,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 40,
+                          vertical: 15,
                         ),
-                        child: const Text("Kết nối"),
+                        textStyle: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
+                      child: const Text("Kết nối"),
+                    ),
               ],
             ),
           ),

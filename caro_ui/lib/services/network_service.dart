@@ -17,6 +17,9 @@ class NetworkService {
   Socket? _socket;
   final StreamController<Map<String, dynamic>> _messageController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<bool> _connectionStatusController =
+      StreamController<bool>.broadcast();
+  Stream<bool> get connectionStatusStream => _connectionStatusController.stream;
   Function(String)? onDisconnected;
 
   // Sửa kiểu dữ liệu của Stream để làm việc trực tiếp với JSON (Map)
@@ -36,7 +39,7 @@ class NetworkService {
         timeout: const Duration(seconds: 5),
       );
       print('Kết nối thành công!');
-
+      _connectionStatusController.add(true);
       String buffer = '';
       _socket!.listen(
         (data) {
@@ -67,11 +70,13 @@ class NetworkService {
         },
         onError: (error) {
           print('Lỗi kết nối: $error');
+          _connectionStatusController.add(false);
           onDisconnected?.call(error.toString());
           disconnect();
         },
         onDone: () {
           print('Server đã đóng kết nối.');
+          _connectionStatusController.add(false);
           onDisconnected?.call('Server đã đóng kết nối.');
           disconnect();
         },
@@ -80,6 +85,7 @@ class NetworkService {
       return true;
     } catch (e) {
       print('Không thể kết nối: $e');
+      _connectionStatusController.add(false);
       return false;
     }
   }

@@ -1,20 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "D:\\Tai lieu\\LTM\\uploadServer\\GameCaro\\Server\\Server.csproj": {}
+    "D:\\Caro\\GameCaro\\GameCaro\\Server\\Server.csproj": {}
   },
   "projects": {
-    "D:\\Tai lieu\\LTM\\uploadServer\\GameCaro\\Server\\Server.csproj": {
+    "D:\\Caro\\GameCaro\\GameCaro\\Server\\Server.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\Tai lieu\\LTM\\uploadServer\\GameCaro\\Server\\Server.csproj",
+        "projectUniqueName": "D:\\Caro\\GameCaro\\GameCaro\\Server\\Server.csproj",
         "projectName": "Server",
-        "projectPath": "D:\\Tai lieu\\LTM\\uploadServer\\GameCaro\\Server\\Server.csproj",
-        "packagesPath": "C:\\Users\\PhatNT\\.nuget\\packages\\",
-        "outputPath": "D:\\Tai lieu\\LTM\\uploadServer\\GameCaro\\Server\\obj\\",
+        "projectPath": "D:\\Caro\\GameCaro\\GameCaro\\Server\\Server.csproj",
+        "packagesPath": "C:\\Users\\Anh Hieu\\.nuget\\packages\\",
+        "outputPath": "D:\\Caro\\GameCaro\\GameCaro\\Server\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\PhatNT\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "C:\\Users\\Anh Hieu\\AppData\\Roaming\\NuGet\\NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net9.0"
@@ -59,7 +59,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.303/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.304/PortableRuntimeIdentifierGraph.json"
         }
       }
     }
