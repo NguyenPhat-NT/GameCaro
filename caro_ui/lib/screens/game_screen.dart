@@ -24,6 +24,9 @@ class _GameScreenState extends State<GameScreen> {
   Timer? _overlayTimer;
   int? _lastKnownCurrentPlayerId;
   int _lastKnownSurrenderedCount = 0;
+  int _lastKnownDisconnectedCount = 0;
+  // Lưu lại ID của người chơi vừa kết nối lại để hiển thị thông báo
+  final Set<int> _justReconnectedPlayerIds = {};
 
   @override
   void initState() {
@@ -86,6 +89,49 @@ class _GameScreenState extends State<GameScreen> {
       _showOverlayMessage("${surrenderedPlayer.playerName} đã đầu hàng");
     } catch (e) {
       print("Không tìm thấy người chơi đã đầu hàng: $surrenderedId");
+    }
+  }
+
+  void _showDisconnectionMessage(
+    GameService gameService, {
+    required bool isDisconnect,
+  }) {
+    // Tìm người chơi vừa thay đổi trạng thái
+    final previousDisconnectedIds =
+        _justReconnectedPlayerIds.isEmpty
+            ? gameService.disconnectedPlayerIds
+            : gameService.disconnectedPlayerIds.union(
+              _justReconnectedPlayerIds,
+            );
+
+    final currentDisconnectedIds = gameService.disconnectedPlayerIds;
+
+    int changedPlayerId = -1;
+
+    if (isDisconnect) {
+      // Một người vừa mất kết nối
+      changedPlayerId =
+          currentDisconnectedIds.difference(previousDisconnectedIds).first;
+    } else {
+      // Một người vừa kết nối lại
+      changedPlayerId =
+          previousDisconnectedIds.difference(currentDisconnectedIds).first;
+      _justReconnectedPlayerIds.add(changedPlayerId);
+    }
+
+    try {
+      final player = gameService.players.firstWhere(
+        (p) => p.playerId == changedPlayerId,
+      );
+      final message =
+          isDisconnect
+              ? "${player.playerName} đã mất kết nối."
+              : "${player.playerName} đã kết nối lại.";
+      _showOverlayMessage(message);
+    } catch (e) {
+      print(
+        "Không tìm thấy người chơi vừa thay đổi trạng thái kết nối: $changedPlayerId",
+      );
     }
   }
 
@@ -154,6 +200,7 @@ class _GameScreenState extends State<GameScreen> {
         }
       });
     }
+
     if (_lastKnownCurrentPlayerId != gameService.currentPlayerId) {
       _lastKnownCurrentPlayerId = gameService.currentPlayerId;
       _showTurnMessage(gameService);
@@ -162,6 +209,16 @@ class _GameScreenState extends State<GameScreen> {
       _lastKnownSurrenderedCount = gameService.surrenderedPlayerIds.length;
       _showSurrenderMessage(gameService);
     }
+    if (_lastKnownDisconnectedCount <
+        gameService.disconnectedPlayerIds.length) {
+      _showDisconnectionMessage(gameService, isDisconnect: true);
+    }
+    // Kiểm tra người chơi kết nối lại
+    else if (_lastKnownDisconnectedCount >
+        gameService.disconnectedPlayerIds.length) {
+      _showDisconnectionMessage(gameService, isDisconnect: false);
+    }
+    _lastKnownDisconnectedCount = gameService.disconnectedPlayerIds.length;
 
     if (gameService.players.isEmpty || myPlayerId == null) {
       return const Scaffold(
@@ -353,37 +410,9 @@ class _GameScreenState extends State<GameScreen> {
               ),
             ),
             const SizedBox(height: 24),
+
             // Nút Chơi lại
-            ElevatedButton(
-              onPressed: () {
-                // Nút này không làm gì cả, chỉ chờ server gửi lệnh
-                _showOverlayMessage(
-                  "Đang chờ những người chơi khác...",
-                  duration: const Duration(seconds: 5),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.parchment,
-              ),
-              child: Text(
-                "Chơi lại", // Đổi tên nút
-                style: Theme.of(
-                  context,
-                ).textTheme.labelLarge?.copyWith(color: AppColors.ink),
-              ),
-            ),
             const SizedBox(height: 12),
-            // Nút Thoát phòng
-            TextButton(
-              onPressed: () {
-                // Chỉ cần gọi leaveRoom, GameService sẽ xử lý việc điều hướng
-                context.read<GameService>().leaveRoom();
-              },
-              child: Text(
-                "Thoát Phòng",
-                style: TextStyle(color: AppColors.parchment),
-              ),
-            ),
           ],
         ),
       ),

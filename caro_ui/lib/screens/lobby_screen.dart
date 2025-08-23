@@ -1,5 +1,5 @@
 // File: caro_ui/lib/screens/lobby_screen.dart
-
+import 'package:caro_ui/services/database_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -7,17 +7,111 @@ import 'package:caro_ui/services/connection_screen.dart';
 import '../game_theme.dart';
 import '../models/player_model.dart';
 import '../services/game_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/chat_drawer.dart';
 import 'game_screen.dart';
 import 'room_list_screen.dart';
 
-class LobbyScreen extends StatelessWidget {
+class LobbyScreen extends StatefulWidget {
   LobbyScreen({super.key});
 
-  final TextEditingController _nameController = TextEditingController(
-    text: "Player",
-  );
+  @override
+  State<LobbyScreen> createState() => _LobbyScreenState();
+}
+
+class _LobbyScreenState extends State<LobbyScreen> {
+  final TextEditingController _nameController = TextEditingController();
   final TextEditingController _roomIdController = TextEditingController();
+  bool _reconnectDialogShown = false;
+
+  void initState() {
+    super.initState();
+    // Dùng addPostFrameCallback để đảm bảo việc build UI đã xong trước khi show dialog
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadPlayerName();
+      _checkAndPromptForReconnect();
+    });
+  }
+
+  Future<void> _loadPlayerName() async {
+    final prefs = await SharedPreferences.getInstance();
+    // --- THAY ĐỔI 2: TRẢ VỀ CHUỖI RỖNG NẾU KHÔNG CÓ TÊN NÀO ĐƯỢC LƯU ---
+    final playerName = prefs.getString('playerName') ?? '';
+    if (mounted) {
+      setState(() {
+        _nameController.text = playerName;
+      });
+    }
+  }
+
+  Future<void> _savePlayerName() async {
+    final prefs = await SharedPreferences.getInstance();
+    final playerName = _nameController.text.trim();
+    if (playerName.isNotEmpty) {
+      await prefs.setString('playerName', playerName);
+      print("Player name saved: $playerName");
+    }
+  }
+
+  Future<void> _checkAndPromptForReconnect() async {
+    if (!mounted || _reconnectDialogShown) return;
+
+    // Lấy GameService từ context
+    final gameService = context.read<GameService>();
+
+    // --- THAY ĐỔI: Thêm khối IF để kiểm tra cờ hiệu ---
+    // Chỉ thực hiện kiểm tra database nếu đây là lần đầu LobbyScreen được tải
+    if (gameService.consumeFirstLobbyLoad()) {
+      final dbService = DatabaseService();
+      final session = await dbService.getSession();
+
+      // Nếu tìm thấy một phiên game đang dang dở
+      if (session != null) {
+        setState(() {
+          _reconnectDialogShown = true; // Đánh dấu đã hiển thị dialog
+        });
+
+        // Hiển thị pop-up hỏi người dùng
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext dialogContext) {
+            return AlertDialog(
+              backgroundColor: AppColors.parchment,
+              title: const Text("Tiếp tục trận đấu?"),
+              content: const Text(
+                "Chúng tôi tìm thấy một trận đấu bạn đang tham gia. Bạn có muốn kết nối lại không?",
+              ),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text("Hủy"),
+                  onPressed: () {
+                    dbService.deleteSession();
+                    Navigator.of(dialogContext).pop();
+                  },
+                ),
+                ElevatedButton(
+                  child: const Text("Kết nối lại"),
+                  onPressed: () {
+                    final roomId = session['roomId'] as String;
+                    final sessionToken = session['sessionToken'] as String;
+                    final playerName = session['myPlayerName'] as String;
+
+                    gameService.reconnectToGame(
+                      roomId,
+                      sessionToken,
+                      playerName,
+                    );
+                    Navigator.of(dialogContext).pop();
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      }
+    }
+  }
 
   void _showJoinRoomDialog(BuildContext context) {
     final gameService = context.read<GameService>();
@@ -182,22 +276,36 @@ class LobbyScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            // SỬA LỖI: Bọc các nút trong Wrap để xuống dòng khi không đủ chỗ
             Wrap(
               spacing: 16,
               runSpacing: 12,
               alignment: WrapAlignment.center,
               children: [
                 ElevatedButton(
-                  onPressed:
-                      () => gameService.createRoom(_nameController.text.trim()),
-                  child: const Text('Tạo Phòng Mới'),
-                ),
-                // THÊM MỚI: Nút Tìm trận
-                ElevatedButton(
                   onPressed: () {
+                    // --- THAY ĐỔI: LƯU TÊN TRƯỚC KHI TẠO PHÒNG ---
                     final playerName = _nameController.text.trim();
                     if (playerName.isNotEmpty) {
+                      _savePlayerName(); // <-- LƯU TÊN
+                      gameService.createRoom(playerName);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Vui lòng nhập tên trước khi tạo phòng.',
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('Tạo Phòng Mới'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    // --- THAY ĐỔI: LƯU TÊN TRƯỚC KHI TÌM TRẬN ---
+                    final playerName = _nameController.text.trim();
+                    if (playerName.isNotEmpty) {
+                      _savePlayerName(); // <-- LƯU TÊN
                       gameService.findMatch(playerName);
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -210,12 +318,27 @@ class LobbyScreen extends StatelessWidget {
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.highlight, // Màu xanh lá
+                    backgroundColor: AppColors.highlight,
                   ),
                   child: const Text('Tìm trận'),
                 ),
                 OutlinedButton(
-                  onPressed: () => _showJoinRoomDialog(context),
+                  onPressed: () {
+                    // --- THAY ĐỔI: LƯU TÊN TRƯỚC KHI VÀO PHÒNG ---
+                    final playerName = _nameController.text.trim();
+                    if (playerName.isNotEmpty) {
+                      _savePlayerName(); // <-- LƯU TÊN
+                      _showJoinRoomDialog(context);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Vui lòng nhập tên trước khi tham gia phòng.',
+                          ),
+                        ),
+                      );
+                    }
+                  },
                   child: const Text('Tham gia phòng'),
                 ),
               ],

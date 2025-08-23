@@ -2,7 +2,7 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
-
+import 'database_service.dart';
 import 'network_service.dart';
 import '../models/player_model.dart';
 import '../models/chat_message_model.dart';
@@ -12,6 +12,7 @@ import '../game_theme.dart';
 
 class GameService with ChangeNotifier {
   final NetworkService _networkService = NetworkService();
+  final DatabaseService _dbService = DatabaseService();
   StreamSubscription? _messageSubscription;
 
   // State
@@ -29,6 +30,7 @@ class GameService with ChangeNotifier {
   bool _shouldNavigateHome = false;
   bool _hasUnreadMessages = false; // Biến cờ hiệu
   bool _shouldReturnToLobby = false;
+  bool _isFirstLobbyLoad = true;
   final Set<int> _surrenderedPlayerIds =
       {}; // <<< THÊM MỚI: Theo dõi người chơi đã đầu hàng
   List<ChatMessage> _chatMessages = [];
@@ -47,6 +49,9 @@ class GameService with ChangeNotifier {
   bool get isDraw => _isDraw;
   bool get shouldReturnToLobby => _shouldReturnToLobby;
   bool get hasUnreadMessages => _hasUnreadMessages;
+  final Set<int> _disconnectedPlayerIds = {};
+  Set<int> get disconnectedPlayerIds => _disconnectedPlayerIds;
+
   bool get shouldNavigateHome => _shouldNavigateHome;
   Set<int> get surrenderedPlayerIds => _surrenderedPlayerIds; // <<< THÊM MỚI
   List<RoomInfo> get availableRooms => _availableRooms;
@@ -79,22 +84,32 @@ class GameService with ChangeNotifier {
     _shouldReturnToLobby = false;
   }
 
+  bool consumeFirstLobbyLoad() {
+    if (_isFirstLobbyLoad) {
+      _isFirstLobbyLoad = false;
+      return true; // Đúng, đây là lần đầu tiên
+    }
+    return false; // Không, đây là các lần sau
+  }
+
   void _handleServerMessage(Map<String, dynamic> message) {
     final type = message['Type'] as String;
     final payload = message['Payload'] as Map<String, dynamic>? ?? {};
 
-    switch (type) {
-      // ... các case khác giữ nguyên
+    // --- LOG DEBUG ---
+    print("----------------------------------------------------");
+    print("DEBUG: Received message type: $type");
+    print("DEBUG: RoomID BEFORE processing: $_roomId");
+    // --- KẾT THÚC LOG DEBUG ---
 
+    switch (type) {
       case 'GAME_START':
         _isGameStarted = true;
         _moves.clear();
-
         _winnerId = null;
-
         _isDraw = false;
-        _surrenderedPlayerIds
-            .clear(); // <<< THÊM MỚI: Reset khi game mới bắt đầu
+        _surrenderedPlayerIds.clear();
+        _disconnectedPlayerIds.clear();
         _currentPlayerId = payload['StartingPlayerId'];
         _boardSize = payload['BoardSize'] as int;
         final playerList = payload['Players'] as List;
@@ -109,6 +124,7 @@ class GameService with ChangeNotifier {
         _myPlayerId = myPlayerInGame.playerId;
         print("Trận đấu bắt đầu! My Player ID is: $_myPlayerId");
         break;
+
       case 'ROOM_LIST_UPDATE':
         final roomsList = payload['Rooms'] as List;
         _availableRooms =
@@ -116,44 +132,57 @@ class GameService with ChangeNotifier {
               return RoomInfo.fromJson(roomJson as Map<String, dynamic>);
             }).toList();
         break;
-      // <<< THÊM MỚI: Xử lý khi có người chơi đầu hàng
+
       case 'PLAYER_SURRENDERED':
         final playerId = payload['PlayerId'] as int?;
         if (playerId != null) {
           _surrenderedPlayerIds.add(playerId);
         }
         break;
+
       case 'RETURN_TO_LOBBY':
-        // Reset lại trạng thái của ván đấu
         _isGameStarted = false;
         _moves.clear();
         _winnerId = null;
         _isDraw = false;
         _currentPlayerId = null;
-        //_surrenderedPlayerIds.clear();
-        // Bật cờ hiệu để GameScreen biết cần phải quay về
+        _surrenderedPlayerIds.clear();
+        _disconnectedPlayerIds.clear();
+
+        if (payload.containsKey('Players')) {
+          final playerList = payload['Players'] as List;
+          _players =
+              playerList
+                  .map((p) => Player.fromJson(p as Map<String, dynamic>))
+                  .toList();
+          print(
+            "✅ Returned to lobby. Updated player list: ${_players.length} players.",
+          );
+        }
+
         _shouldReturnToLobby = true;
         break;
-      case 'PLAYER_LEFT': // Người chơi khác thoát phòng [cite: 39]
+
+      case 'PLAYER_LEFT':
         final playerId = payload['PlayerId'] as int;
         _players.removeWhere((p) => p.playerId == playerId);
+        _disconnectedPlayerIds.remove(playerId);
         break;
 
-      case 'LEAVE_ROOM_SUCCESS': // Bạn đã thoát phòng thành công [cite: 35]
-      case 'ROOM_CLOSED': // Chủ phòng thoát, phòng bị đóng [cite: 43]
+      case 'LEAVE_ROOM_SUCCESS':
+      case 'ROOM_CLOSED':
+        // --- LOG DEBUG ---
+        print(
+          "DEBUG: Clearing RoomID because of LEAVE_ROOM_SUCCESS or ROOM_CLOSED.",
+        );
         _roomId = null;
         _players = [];
         _isGameStarted = false;
         _moves = [];
         _chatMessages = [];
-        // Không set _shouldNavigateHome = true nữa
+        _dbService.deleteSession();
         break;
 
-      case 'PLAYER_SURRENDERED': // Một người chơi đã đầu hàng [cite: 51]
-        final playerId = payload['PlayerId'] as int;
-        _surrenderedPlayerIds.add(playerId);
-        break;
-      // ... các case khác giữ nguyên
       case 'ROOM_CREATED':
         _roomId = payload['RoomId'];
         _sessionToken = payload['SessionToken'];
@@ -167,8 +196,14 @@ class GameService with ChangeNotifier {
             isHost: true,
           ),
         ];
-
+        _dbService.saveSession(
+          roomId: _roomId!,
+          sessionToken: _sessionToken!,
+          myPlayerId: _myPlayerId!,
+          myPlayerName: _myPlayerName!,
+        );
         break;
+
       case 'JOIN_RESULT':
         if (payload['Success'] == true) {
           _roomId = payload['RoomId'];
@@ -179,26 +214,27 @@ class GameService with ChangeNotifier {
               playerList
                   .map((p) => Player.fromJson(p as Map<String, dynamic>))
                   .toList();
-          if (!_players.any((p) => p.playerName == _myPlayerName)) {
-            final myId = _players.length;
-            _myPlayerId = myId;
-            _players.add(
-              Player(
-                playerName: _myPlayerName!,
-                playerId: myId,
-                color: AppColors.playerColors[myId % 4],
-                isHost: false,
-              ),
-            );
-          }
+          final myPlayerInRoom = _players.firstWhere(
+            (p) => p.playerName == _myPlayerName,
+            orElse: () => _players.last,
+          );
+          _myPlayerId = myPlayerInRoom.playerId;
+          _dbService.saveSession(
+            roomId: _roomId!,
+            sessionToken: _sessionToken!,
+            myPlayerId: _myPlayerId!,
+            myPlayerName: _myPlayerName!,
+          );
         }
         break;
+
       case 'PLAYER_JOINED':
         final newPlayer = Player.fromJson(payload);
         if (!_players.any((p) => p.playerId == newPlayer.playerId)) {
           _players.add(newPlayer);
         }
         break;
+
       case 'CHAT_MESSAGE_RECEIVED':
         final newChatMessage = ChatMessage.fromJson(payload);
         _chatMessages.add(newChatMessage);
@@ -208,8 +244,8 @@ class GameService with ChangeNotifier {
           _hasUnreadMessages = true;
         }
         break;
+
       case 'GAME_STATE_UPDATE':
-        // ... (xử lý Players, Moves,...)
         if (payload.containsKey('ChatHistory')) {
           final chatHistoryList = payload['ChatHistory'] as List;
           _chatMessages =
@@ -221,6 +257,7 @@ class GameService with ChangeNotifier {
                   .toList();
         }
         break;
+
       case 'BOARD_UPDATE':
         final newMove = Move(
           x: payload['X'],
@@ -229,9 +266,11 @@ class GameService with ChangeNotifier {
         );
         _moves.add(newMove);
         break;
+
       case 'TURN_UPDATE':
         _currentPlayerId = payload['NextPlayerId'];
         break;
+
       case 'GAME_OVER':
         _isDraw = payload['IsDraw'] as bool? ?? false;
         if (!_isDraw) {
@@ -239,7 +278,65 @@ class GameService with ChangeNotifier {
         }
         print("Game Over! WinnerId: $_winnerId, IsDraw: $_isDraw");
         break;
+
+      case 'PLAYER_DISCONNECTED':
+        final playerId = payload['PlayerId'] as int?;
+        if (playerId != null) {
+          _disconnectedPlayerIds.add(playerId);
+        }
+        break;
+
+      case 'PLAYER_RECONNECTED':
+        final playerId = payload['PlayerId'] as int?;
+        if (playerId != null) {
+          _disconnectedPlayerIds.remove(playerId);
+        }
+        break;
+
+      case 'RECONNECT_RESULT':
+        final success = payload['Success'] as bool? ?? false;
+        if (success) {
+          print("✅ Reconnect success! Restoring game state...");
+          final gameState = payload['GameState'] as Map<String, dynamic>;
+          final playerList = gameState['Players'] as List;
+          _players =
+              playerList
+                  .map((p) => Player.fromJson(p as Map<String, dynamic>))
+                  .toList();
+          final myPlayerInfo = _players.firstWhere(
+            (p) => p.playerName == _myPlayerName,
+          );
+          _myPlayerId = myPlayerInfo.playerId;
+          final movesList = gameState['Moves'] as List;
+          _moves =
+              movesList
+                  .map(
+                    (m) => Move(x: m['X'], y: m['Y'], playerId: m['PlayerId']),
+                  )
+                  .toList();
+          _currentPlayerId = gameState['CurrentPlayerId'];
+          final chatHistoryList = gameState['ChatHistory'] as List;
+          _chatMessages =
+              chatHistoryList
+                  .map(
+                    (chat) =>
+                        ChatMessage.fromJson(chat as Map<String, dynamic>),
+                  )
+                  .toList();
+          _isGameStarted = true;
+        } else {
+          print(
+            "🚨 Reconnect failed! (Game may have ended). Deleting session.",
+          );
+          _dbService.deleteSession();
+        }
+        break;
     }
+
+    // --- LOG DEBUG ---
+    print("DEBUG: RoomID AFTER processing: $_roomId");
+    print("----------------------------------------------------");
+    // --- KẾT THÚC LOG DEBUG ---
     notifyListeners();
   }
 
@@ -296,12 +393,6 @@ class GameService with ChangeNotifier {
     }
   }
 
-  @override
-  void dispose() {
-    _messageSubscription?.cancel();
-    super.dispose();
-  }
-
   void sendChatMessage(String message) {
     if (message.trim().isNotEmpty) {
       _networkService.send('SEND_CHAT_MESSAGE', {'Message': message});
@@ -312,5 +403,23 @@ class GameService with ChangeNotifier {
     if (_players.any((p) => p.playerId == _myPlayerId && p.isHost)) {
       _networkService.send('START_GAME_EARLY', {});
     }
+  }
+
+  void reconnectToGame(String roomId, String sessionToken, String playerName) {
+    // Cập nhật lại tên người chơi từ session đã lưu, phòng trường hợp state bị mất
+    _myPlayerName = playerName;
+    _roomId = roomId;
+    // Gửi yêu cầu RECONNECT lên server
+    _networkService.send('RECONNECT', {
+      'RoomId': roomId,
+      'SessionToken': sessionToken,
+    });
+    print("🚀 Sending reconnect request for room: $roomId");
+  }
+
+  @override
+  void dispose() {
+    _messageSubscription?.cancel();
+    super.dispose();
   }
 }
