@@ -488,45 +488,5 @@ private int FindJsonEnd(string buffer)
         this.PlayerData.HasConfirmedReadiness = true;
         Console.WriteLine($"[AFK Check] Player {this.PlayerData.PlayerName} confirmed readiness.");
     }
-}public class PlaySoundNotification : BaseMessage
-{
-    public new string Type { get; set; } = "PLAY_SOUND";
-    public PlaySoundPayload Payload { get; set; }
 }
-
-public class PlaySoundPayload
-{
-    public string SoundName { get; set; } = ""; // ví dụ: "move", "win", "lose", "chat"
-}
-
-public class ShowEffectNotification : BaseMessage
-{
-    public new string Type { get; set; } = "SHOW_EFFECT";
-    public ShowEffectPayload Payload { get; set; }
-}
-
-public class ShowEffectPayload
-{
-    public string EffectType { get; set; } = ""; // ví dụ: "fireworks", "highlight", "shake"
-    public int? X { get; set; } // nếu có hiệu ứng trên bàn case "PLAY_SOUND":
-    var soundName = msg.Payload.SoundName;
-    AudioManager.Instance.Play(soundName);
-    break;
-ờ
-    public int? Y { get; set; }
-}
-// Sau khi gửi thông báo cập nhật bàn cờ
-var soundNotif = new PlaySoundNotification
-{
-    Payload = new PlaySoundPayload { SoundName = "move" }
-};
-await BroadcastMessageAsync(soundNotif);
-
-// Hiệu ứng highlight tại ô vừa đánh
-var effectNotif = new ShowEffectNotification
-{
-    Payload = new ShowEffectPayload { EffectType = "highlight", X = x, Y = y }
-};
-await BroadcastMessageAsync(effectNotif);
-
 }
