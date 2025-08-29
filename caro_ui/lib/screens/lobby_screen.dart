@@ -8,6 +8,7 @@ import '../game_theme.dart';
 import '../models/player_model.dart';
 import '../services/game_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/sound_service.dart'; // <-- Đảm bảo có import này
 import '../widgets/chat_drawer.dart';
 import 'game_screen.dart';
 import 'room_list_screen.dart';
@@ -24,9 +25,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
   final TextEditingController _roomIdController = TextEditingController();
   bool _reconnectDialogShown = false;
 
+  @override
   void initState() {
     super.initState();
-    // Dùng addPostFrameCallback để đảm bảo việc build UI đã xong trước khi show dialog
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadPlayerName();
       _checkAndPromptForReconnect();
@@ -35,7 +36,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
   Future<void> _loadPlayerName() async {
     final prefs = await SharedPreferences.getInstance();
-    // --- THAY ĐỔI 2: TRẢ VỀ CHUỖI RỖNG NẾU KHÔNG CÓ TÊN NÀO ĐƯỢC LƯU ---
     final playerName = prefs.getString('playerName') ?? '';
     if (mounted) {
       setState(() {
@@ -49,29 +49,19 @@ class _LobbyScreenState extends State<LobbyScreen> {
     final playerName = _nameController.text.trim();
     if (playerName.isNotEmpty) {
       await prefs.setString('playerName', playerName);
-      print("Player name saved: $playerName");
     }
   }
 
   Future<void> _checkAndPromptForReconnect() async {
     if (!mounted || _reconnectDialogShown) return;
-
-    // Lấy GameService từ context
     final gameService = context.read<GameService>();
-
-    // --- THAY ĐỔI: Thêm khối IF để kiểm tra cờ hiệu ---
-    // Chỉ thực hiện kiểm tra database nếu đây là lần đầu LobbyScreen được tải
     if (gameService.consumeFirstLobbyLoad()) {
       final dbService = DatabaseService();
       final session = await dbService.getSession();
-
-      // Nếu tìm thấy một phiên game đang dang dở
       if (session != null) {
         setState(() {
-          _reconnectDialogShown = true; // Đánh dấu đã hiển thị dialog
+          _reconnectDialogShown = true;
         });
-
-        // Hiển thị pop-up hỏi người dùng
         showDialog(
           context: context,
           barrierDismissible: false,
@@ -86,6 +76,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                 TextButton(
                   child: const Text("Hủy"),
                   onPressed: () {
+                    SoundService().playClickSound(); // <-- THÊM ÂM THANH
                     dbService.deleteSession();
                     Navigator.of(dialogContext).pop();
                   },
@@ -93,10 +84,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
                 ElevatedButton(
                   child: const Text("Kết nối lại"),
                   onPressed: () {
+                    SoundService().playClickSound(); // <-- THÊM ÂM THANH
                     final roomId = session['roomId'] as String;
                     final sessionToken = session['sessionToken'] as String;
                     final playerName = session['myPlayerName'] as String;
-
                     gameService.reconnectToGame(
                       roomId,
                       sessionToken,
@@ -133,10 +124,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Bọc TextField và các nút trong một Row
                   Row(
                     children: [
-                      // Dùng Expanded để TextField chiếm hết không gian còn lại
                       Expanded(
                         child: TextField(
                           controller: roomIdController,
@@ -148,11 +137,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
                           textAlign: TextAlign.center,
                         ),
                       ),
-                      const SizedBox(
-                        width: 8,
-                      ), // Khoảng cách giữa TextField và nút
+                      const SizedBox(width: 8),
                       ElevatedButton(
                         onPressed: () {
+                          SoundService().playClickSound(); // <-- THÊM ÂM THANH
                           final roomId =
                               roomIdController.text.trim().toUpperCase();
                           if (roomId.isNotEmpty && playerName.isNotEmpty) {
@@ -165,9 +153,11 @@ class _LobbyScreenState extends State<LobbyScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  // Nút Hủy có thể đặt riêng ở đây hoặc trong Row trên
                   TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () {
+                      SoundService().playClickSound(); // <-- THÊM ÂM THANH
+                      Navigator.of(context).pop();
+                    },
                     child: const Text(
                       "Hủy",
                       style: TextStyle(color: AppColors.ink),
@@ -222,28 +212,32 @@ class _LobbyScreenState extends State<LobbyScreen> {
         ),
         automaticallyImplyLeading: false,
         actions: [
-          // Chỉ hiển thị nút này khi chưa ở trong phòng chờ nào
           if (!isInLobby)
-            IconButton(
-              icon: const Icon(Icons.menu_open),
-              tooltip: 'Danh sách phòng',
-              onPressed: () {
-                // Lưu lại tên người chơi trước khi chuyển màn hình
-                final playerName = _nameController.text.trim();
-                if (playerName.isNotEmpty) {
-                  gameService.setMyPlayerName(playerName);
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const RoomListScreen(),
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Vui lòng nhập tên người chơi trước.'),
-                    ),
-                  );
-                }
+            Builder(
+              builder: (context) {
+                return IconButton(
+                  icon: const Icon(Icons.menu), // Icon 3 gạch
+                  tooltip: 'Danh sách phòng',
+                  onPressed: () {
+                    SoundService().playClickSound(); // <-- THÊM ÂM THANH
+                    final playerName = _nameController.text.trim();
+                    if (playerName.isNotEmpty) {
+                      _savePlayerName();
+                      gameService.setMyPlayerName(playerName);
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const RoomListScreen(),
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Vui lòng nhập tên người chơi trước.'),
+                        ),
+                      );
+                    }
+                  },
+                );
               },
             ),
         ],
@@ -274,6 +268,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                 labelText: "Tên người chơi",
                 border: OutlineInputBorder(),
               ),
+              onChanged: (_) => _savePlayerName(),
             ),
             const SizedBox(height: 20),
             Wrap(
@@ -283,10 +278,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
               children: [
                 ElevatedButton(
                   onPressed: () {
-                    // --- THAY ĐỔI: LƯU TÊN TRƯỚC KHI TẠO PHÒNG ---
+                    SoundService().playClickSound();
                     final playerName = _nameController.text.trim();
                     if (playerName.isNotEmpty) {
-                      _savePlayerName(); // <-- LƯU TÊN
+                      _savePlayerName();
                       gameService.createRoom(playerName);
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -302,10 +297,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    // --- THAY ĐỔI: LƯU TÊN TRƯỚC KHI TÌM TRẬN ---
+                    SoundService().playClickSound();
                     final playerName = _nameController.text.trim();
                     if (playerName.isNotEmpty) {
-                      _savePlayerName(); // <-- LƯU TÊN
+                      _savePlayerName();
                       gameService.findMatch(playerName);
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -324,10 +319,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
                 ),
                 OutlinedButton(
                   onPressed: () {
-                    // --- THAY ĐỔI: LƯU TÊN TRƯỚC KHI VÀO PHÒNG ---
+                    SoundService().playClickSound();
                     final playerName = _nameController.text.trim();
                     if (playerName.isNotEmpty) {
-                      _savePlayerName(); // <-- LƯU TÊN
+                      _savePlayerName();
                       _showJoinRoomDialog(context);
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -350,7 +345,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
   }
 
   Widget _buildLobbyView(BuildContext context) {
-    // --- THAY ĐỔI: Bọc cột trái trong SingleChildScrollView ---
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Row(
@@ -359,7 +353,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
           Expanded(
             flex: 2,
             child: SingleChildScrollView(
-              // <--- Bọc ở đây
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -409,6 +402,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
             IconButton(
               icon: const Icon(Icons.copy),
               onPressed: () {
+                SoundService().playClickSound(); // <-- THÊM ÂM THANH
                 Clipboard.setData(ClipboardData(text: gameService.roomId!));
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Đã sao chép mã phòng!')),
@@ -489,13 +483,11 @@ class _LobbyActionButtons extends StatelessWidget {
               icon: const Icon(Icons.chat_bubble_outline),
               label: const Text("Trò chuyện"),
               onPressed: () {
-                // BƯỚC 3: Đánh dấu đã đọc tin nhắn
+                SoundService().playClickSound(); // <-- THÊM ÂM THANH
                 context.read<GameService>().markChatAsRead();
-                // Mở ngăn kéo chat
                 Scaffold.of(context).openEndDrawer();
               },
             ),
-            // BƯỚC 2: Hiển thị chấm đỏ nếu có tin nhắn chưa đọc
             if (gameService.hasUnreadMessages)
               Positioned(
                 top: -4,
@@ -516,13 +508,19 @@ class _LobbyActionButtons extends StatelessWidget {
           ElevatedButton.icon(
             icon: const Icon(Icons.play_arrow),
             label: const Text("Bắt đầu"),
-            onPressed: () => gameService.startGameEarly(),
+            onPressed: () {
+              SoundService().playClickSound(); // <-- THÊM ÂM THANH
+              gameService.startGameEarly();
+            },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
           ),
         ElevatedButton.icon(
           icon: const Icon(Icons.exit_to_app),
           label: const Text("Rời phòng"),
-          onPressed: () => gameService.leaveRoom(),
+          onPressed: () {
+            SoundService().playClickSound(); // <-- THÊM ÂM THANH
+            gameService.leaveRoom();
+          },
           style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
         ),
       ],

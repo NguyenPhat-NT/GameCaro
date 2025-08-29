@@ -5,11 +5,11 @@ import 'package:caro_ui/screens/lobby_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:caro_ui/widgets/chat_drawer.dart';
 import 'package:provider/provider.dart';
-
+import '../services/sound_service.dart';
 import '../services/game_service.dart';
 import '../game_theme.dart';
 import '../widgets/player_info_card.dart';
-import '../widgets/game_board.dart'; // Đảm bảo dòng import này tồn tại
+import '../widgets/game_board.dart';
 import '../models/player_model.dart';
 
 class GameScreen extends StatefulWidget {
@@ -25,12 +25,14 @@ class _GameScreenState extends State<GameScreen> {
   int? _lastKnownCurrentPlayerId;
   int _lastKnownSurrenderedCount = 0;
   int _lastKnownDisconnectedCount = 0;
-  // Lưu lại ID của người chơi vừa kết nối lại để hiển thị thông báo
   final Set<int> _justReconnectedPlayerIds = {};
 
   @override
   void initState() {
     super.initState();
+
+    SoundService().playBgm();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final gameService = context.read<GameService>();
@@ -41,6 +43,8 @@ class _GameScreenState extends State<GameScreen> {
 
   @override
   void dispose() {
+    SoundService().stopBgm();
+
     _overlayTimer?.cancel();
     super.dispose();
   }
@@ -72,9 +76,7 @@ class _GameScreenState extends State<GameScreen> {
         );
         _showOverlayMessage("Lượt của: ${currentPlayer.playerName}");
       } catch (e) {
-        print(
-          "Không tìm thấy người chơi có lượt đi: ${gameService.currentPlayerId}",
-        );
+        // Lỗi không tìm thấy người chơi
       }
     }
   }
@@ -88,7 +90,7 @@ class _GameScreenState extends State<GameScreen> {
       );
       _showOverlayMessage("${surrenderedPlayer.playerName} đã đầu hàng");
     } catch (e) {
-      print("Không tìm thấy người chơi đã đầu hàng: $surrenderedId");
+      // Lỗi không tìm thấy
     }
   }
 
@@ -96,29 +98,22 @@ class _GameScreenState extends State<GameScreen> {
     GameService gameService, {
     required bool isDisconnect,
   }) {
-    // Tìm người chơi vừa thay đổi trạng thái
     final previousDisconnectedIds =
         _justReconnectedPlayerIds.isEmpty
             ? gameService.disconnectedPlayerIds
             : gameService.disconnectedPlayerIds.union(
               _justReconnectedPlayerIds,
             );
-
     final currentDisconnectedIds = gameService.disconnectedPlayerIds;
-
     int changedPlayerId = -1;
-
     if (isDisconnect) {
-      // Một người vừa mất kết nối
       changedPlayerId =
           currentDisconnectedIds.difference(previousDisconnectedIds).first;
     } else {
-      // Một người vừa kết nối lại
       changedPlayerId =
           previousDisconnectedIds.difference(currentDisconnectedIds).first;
       _justReconnectedPlayerIds.add(changedPlayerId);
     }
-
     try {
       final player = gameService.players.firstWhere(
         (p) => p.playerId == changedPlayerId,
@@ -129,9 +124,7 @@ class _GameScreenState extends State<GameScreen> {
               : "${player.playerName} đã kết nối lại.";
       _showOverlayMessage(message);
     } catch (e) {
-      print(
-        "Không tìm thấy người chơi vừa thay đổi trạng thái kết nối: $changedPlayerId",
-      );
+      // Lỗi không tìm thấy
     }
   }
 
@@ -189,10 +182,7 @@ class _GameScreenState extends State<GameScreen> {
 
     if (gameService.shouldReturnToLobby) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        // Reset cờ hiệu để không bị lặp vô hạn
         context.read<GameService>().consumeReturnToLobbySignal();
-
-        // Thay thế màn hình hiện tại bằng LobbyScreen
         if (mounted) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (context) => LobbyScreen()),
@@ -212,9 +202,7 @@ class _GameScreenState extends State<GameScreen> {
     if (_lastKnownDisconnectedCount <
         gameService.disconnectedPlayerIds.length) {
       _showDisconnectionMessage(gameService, isDisconnect: true);
-    }
-    // Kiểm tra người chơi kết nối lại
-    else if (_lastKnownDisconnectedCount >
+    } else if (_lastKnownDisconnectedCount >
         gameService.disconnectedPlayerIds.length) {
       _showDisconnectionMessage(gameService, isDisconnect: false);
     }
@@ -255,8 +243,10 @@ class _GameScreenState extends State<GameScreen> {
               _buildPlayerCorners(context, gameService),
               _GameControlButtons(onSurrenderPressed: _onSurrenderPressed),
               _buildOverlayIndicator(),
+
+              // *** THAY ĐỔI: GỌI WIDGET HIỆU ỨNG MỚI ***
               if (gameService.winnerId != null || gameService.isDraw)
-                _buildWinnerOverlay(context),
+                WinnerOverlay(),
             ],
           ),
         ),
@@ -290,13 +280,12 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Widget _buildPlayerCorners(BuildContext context, GameService gameService) {
+    // ... code widget này giữ nguyên không đổi ...
     final players = gameService.players;
     final currentPlayerId = gameService.currentPlayerId;
     final surrenderedIds = gameService.surrenderedPlayerIds;
 
-    // Hàm phụ để tạo widget cho một người chơi
     Widget buildPlayerWidget(Player player, Alignment alignment) {
-      // Xác định vị trí dựa trên alignment
       final position =
           (alignment == Alignment.topLeft)
               ? Positioned(
@@ -334,7 +323,6 @@ class _GameScreenState extends State<GameScreen> {
       return position;
     }
 
-    // Xác định các vị trí cho tối đa 4 người chơi
     final alignments = [
       Alignment.topLeft,
       Alignment.topRight,
@@ -344,7 +332,6 @@ class _GameScreenState extends State<GameScreen> {
 
     return Stack(
       children: [
-        // Dùng vòng lặp để tạo widget cho mỗi người chơi có trong phòng
         for (int i = 0; i < players.length; i++)
           buildPlayerWidget(players[i], alignments[i]),
       ],
@@ -357,9 +344,9 @@ class _GameScreenState extends State<GameScreen> {
     Set<int> surrenderedIds, {
     bool nameFirst = false,
   }) {
+    // ... code widget này giữ nguyên không đổi ...
     final card = PlayerInfoCard(
       player: player,
-      // SỬA LỖI: So sánh với playerId thực tế của người chơi
       isMyTurn: currentPlayerId == player.playerId,
       hasSurrendered: surrenderedIds.contains(player.playerId),
     );
@@ -369,7 +356,6 @@ class _GameScreenState extends State<GameScreen> {
         context,
       ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
     );
-
     return Column(
       children:
           nameFirst
@@ -377,50 +363,10 @@ class _GameScreenState extends State<GameScreen> {
               : [card, const SizedBox(height: 4), name],
     );
   }
-
-  Widget _buildWinnerOverlay(BuildContext context) {
-    final gameService = context.read<GameService>();
-    String message;
-    Player? winner;
-    if (gameService.isDraw) {
-      message = "HÒA CỜ!";
-    } else if (gameService.winnerId != null && gameService.players.isNotEmpty) {
-      try {
-        winner = gameService.players.firstWhere(
-          (p) => p.playerId == gameService.winnerId,
-        );
-        message = "${winner.playerName} đã chiến thắng!";
-      } catch (e) {
-        message = "Trận đấu kết thúc!";
-      }
-    } else {
-      message = "Trận đấu kết thúc!";
-    }
-    return Container(
-      color: AppColors.ink.withOpacity(0.7),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              message,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: AppColors.highlight,
-                fontSize: 32,
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Nút Chơi lại
-            const SizedBox(height: 12),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _GameControlButtons extends StatelessWidget {
+  // ... code widget này giữ nguyên không đổi ...
   final VoidCallback onSurrenderPressed;
   const _GameControlButtons({required this.onSurrenderPressed});
 
@@ -458,13 +404,11 @@ class _GameControlButtons extends StatelessWidget {
                   tooltip: "Trò chuyện",
                   icon: const Icon(Icons.chat_bubble_outline),
                   onPressed: () {
-                    // BƯỚC 3: Đánh dấu đã đọc tin nhắn
+                    SoundService().playClickSound();
                     context.read<GameService>().markChatAsRead();
-                    // Mở ngăn kéo chat
                     Scaffold.of(context).openEndDrawer();
                   },
                 ),
-                // BƯỚC 2: Hiển thị chấm đỏ nếu có tin nhắn chưa đọc
                 if (gameService.hasUnreadMessages)
                   Padding(
                     padding: const EdgeInsets.only(top: 8.0, right: 8.0),
@@ -482,9 +426,111 @@ class _GameControlButtons extends StatelessWidget {
             IconButton(
               tooltip: "Đầu hàng",
               icon: const Icon(Icons.flag_outlined),
-              onPressed: onSurrenderPressed,
+              onPressed: () {
+                SoundService().playClickSound();
+                onSurrenderPressed();
+              },
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// *** WIDGET MỚI ĐƯỢC THÊM VÀO ***
+class WinnerOverlay extends StatefulWidget {
+  const WinnerOverlay({super.key});
+
+  @override
+  State<WinnerOverlay> createState() => _WinnerOverlayState();
+}
+
+class _WinnerOverlayState extends State<WinnerOverlay>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+
+    _scaleAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.elasticOut, // Hiệu ứng nảy
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeIn,
+      ), // Hiệu ứng mờ dần
+    );
+
+    // Bắt đầu chạy hiệu ứng
+    _controller.forward();
+
+    final gameService = context.read<GameService>();
+    if (!gameService.isDraw) {
+      // Chỉ phát âm thanh khi có người thắng, không phát khi hòa
+      SoundService().playWinSound();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final gameService = context.read<GameService>();
+    String message;
+    Player? winner;
+
+    if (gameService.isDraw) {
+      message = "HÒA CỜ!";
+    } else if (gameService.winnerId != null && gameService.players.isNotEmpty) {
+      try {
+        winner = gameService.players.firstWhere(
+          (p) => p.playerId == gameService.winnerId,
+        );
+        message = "${winner.playerName} đã chiến thắng!";
+      } catch (e) {
+        message = "Trận đấu kết thúc!";
+      }
+    } else {
+      message = "Trận đấu kết thúc!";
+    }
+
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: Container(
+        color: AppColors.ink.withOpacity(0.7),
+        child: Center(
+          child: ScaleTransition(
+            scale: _scaleAnimation,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: AppColors.highlight,
+                    fontSize: 32,
+                  ),
+                ),
+                // Có thể thêm các nút Chơi lại / Thoát ở đây nếu muốn
+              ],
+            ),
+          ),
         ),
       ),
     );

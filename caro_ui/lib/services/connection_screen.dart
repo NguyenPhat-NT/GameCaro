@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
+import 'sound_service.dart';
 import '../screens/lobby_screen.dart';
 import 'network_service.dart';
 import 'game_service.dart';
@@ -28,6 +28,7 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
   }
 
   void _connectToServer() async {
+    SoundService().playClickSound();
     setState(() {
       _isLoading = true;
     });

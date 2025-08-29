@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import '../models/move_model.dart';
 import '../models/player_model.dart';
 import 'board_painter.dart';
-import '../game_theme.dart';
 
 class GameBoard extends StatefulWidget {
   final int width;
@@ -27,14 +26,33 @@ class GameBoard extends StatefulWidget {
   State<GameBoard> createState() => _GameBoardState();
 }
 
-class _GameBoardState extends State<GameBoard> {
+class _GameBoardState extends State<GameBoard>
+    with SingleTickerProviderStateMixin {
   late TransformationController _transformationController;
   Point<int>? _pendingCell;
+
+  late AnimationController _moveController;
+  late Animation<double> _moveAnimation;
 
   @override
   void initState() {
     super.initState();
     _transformationController = TransformationController();
+
+    _moveController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+
+    _moveAnimation = CurvedAnimation(
+      parent: _moveController,
+      curve: Curves.elasticOut,
+    );
+
+    // THAY ĐỔI QUAN TRỌNG: Xóa bỏ listener ở đây
+    // _moveAnimation.addListener(() {
+    //   setState(() {});
+    // });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -56,12 +74,26 @@ class _GameBoardState extends State<GameBoard> {
   }
 
   @override
+  void didUpdateWidget(covariant GameBoard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    print(
+      "DEBUG 5: [GameBoard] didUpdateWidget. Moves cũ: ${oldWidget.moves.length}, Moves mới: ${widget.moves.length}",
+    );
+
+    if (widget.moves.length > oldWidget.moves.length) {
+      _moveController.forward(from: 0.0);
+    }
+  }
+
+  @override
   void dispose() {
     _transformationController.dispose();
+    _moveController.dispose();
     super.dispose();
   }
 
   void _handleTap(Offset boardPosition, Size boardRenderSize) {
+    // ... logic _handleTap giữ nguyên như cũ ...
     final double cellHorizontalSize = boardRenderSize.width / widget.width;
     final double cellVerticalSize = boardRenderSize.height / widget.height;
     final double cellSize = min(cellHorizontalSize, cellVerticalSize);
@@ -107,7 +139,6 @@ class _GameBoardState extends State<GameBoard> {
           constraints.maxHeight,
         );
 
-        // Bỏ Container và ClipRect để loại bỏ viền ngoài
         return InteractiveViewer(
           transformationController: _transformationController,
           panAxis: PanAxis.vertical,
@@ -133,6 +164,8 @@ class _GameBoardState extends State<GameBoard> {
                 players: widget.players,
                 lastMove: widget.moves.isNotEmpty ? widget.moves.last : null,
                 pendingCell: _pendingCell,
+                moveAnimation:
+                    _moveAnimation, // Giữ nguyên việc truyền animation
               ),
             ),
           ),
