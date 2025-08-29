@@ -194,11 +194,29 @@ class GameService with ChangeNotifier {
               playerList
                   .map((p) => Player.fromJson(p as Map<String, dynamic>))
                   .toList();
+          if (!_players.any((p) => p.playerName == _myPlayerName)) {
+            final myId = _players.length; // Sẽ là 0 nếu ta là người đầu tiên
+            final amIHost = _players.isEmpty;
+
+            // Tự thêm thông tin của mình vào danh sách
+            _players.add(
+              Player(
+                playerName: _myPlayerName!,
+                playerId: myId,
+                color:
+                    AppColors.playerColors[myId %
+                        AppColors.playerColors.length],
+                isHost: amIHost,
+              ),
+            );
+          }
+
+          // Bây giờ, danh sách _players sẽ không bao giờ rỗng khi ta tìm kiếm
           final myPlayerInRoom = _players.firstWhere(
             (p) => p.playerName == _myPlayerName,
-            orElse: () => _players.last,
           );
           _myPlayerId = myPlayerInRoom.playerId;
+
           _dbService.saveSession(
             roomId: _roomId!,
             sessionToken: _sessionToken!,
